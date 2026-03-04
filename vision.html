@@ -133,10 +133,10 @@
                 </div>
             </div>
 
-            <!-- Jetson Camera -->
+            <!-- Jetson Camera with YOLO -->
             <div class="cam-card">
                 <div class="cam-header">
-                    <h3>📷 JETSON ORIN — Oficina (ángulo 2)</h3>
+                    <h3>🤖 JETSON ORIN — YOLO AI Vision</h3>
                     <span class="live" id="jetsonLive">LIVE</span>
                 </div>
                 <div class="cam-view">
@@ -148,6 +148,30 @@
                     <button onclick="captureCam('jetson')">📸 Captura</button>
                     <button onclick="toggleFullscreen('jetsonCam')">⛶ Full</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- YOLO DETECTIONS PANEL -->
+        <div class="stats" id="yoloStats" style="margin-bottom:16px">
+            <div class="stat">
+                <div class="label">🤖 YOLO DETECTIONS</div>
+                <div class="value" id="detCount">0</div>
+                <div class="sub">Elecnor Safety Brain · 58 clases</div>
+            </div>
+            <div class="stat">
+                <div class="label">🟢 EPIs DETECTADOS</div>
+                <div class="value" id="epiCount" style="color:var(--green)">—</div>
+                <div class="sub">Cascos, chalecos, guantes...</div>
+            </div>
+            <div class="stat">
+                <div class="label">🔴 ALERTAS SEGURIDAD</div>
+                <div class="value" id="alertCount" style="color:var(--red)">—</div>
+                <div class="sub">Sin casco, sin chaleco...</div>
+            </div>
+            <div class="stat">
+                <div class="label">📋 ÚLTIMO OBJETO</div>
+                <div class="value" id="lastObj" style="font-size:0.8em">—</div>
+                <div class="sub" id="lastObjConf">Esperando detecciones...</div>
             </div>
         </div>
 
@@ -263,6 +287,39 @@
         entries.insertBefore(div, entries.firstChild);
         if (entries.children.length > 50) entries.removeChild(entries.lastChild);
     }
+
+    // YOLO detections polling
+    const epiClasses = ['Arnes','Botas de Trabajo','Casco','Chaleco Reflectante','Chaleco Seguridad','Gafas','Guantes','mascara','uniforme'];
+    const alertClasses = ['No Arnes','No Botas','No Casco','No Chaleco','No Gafas','No Guantes'];
+    
+    async function pollDetections() {
+        try {
+            const res = await fetch('/api/cam/jetson/detections');
+            if (!res.ok) return;
+            const data = await res.json();
+            const dets = data.detections || [];
+            document.getElementById('detCount').textContent = dets.length;
+            
+            const epis = dets.filter(d => epiClasses.includes(d.class));
+            const alerts = dets.filter(d => alertClasses.includes(d.class));
+            
+            document.getElementById('epiCount').textContent = epis.length || '—';
+            document.getElementById('alertCount').textContent = alerts.length || '—';
+            
+            if (dets.length > 0) {
+                const best = dets.reduce((a,b) => a.confidence > b.confidence ? a : b);
+                document.getElementById('lastObj').textContent = best.class;
+                document.getElementById('lastObjConf').textContent = `Confianza: ${(best.confidence*100).toFixed(0)}%`;
+            }
+            
+            // Log alerts
+            alerts.forEach(a => {
+                addLog('YOLO', `⚠️ ${a.class} detectado (${(a.confidence*100).toFixed(0)}%)`, 'alert');
+            });
+        } catch(e) {}
+    }
+    setInterval(pollDetections, 3000);
+    pollDetections();
 
     // Uptime counter
     setInterval(() => {

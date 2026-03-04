@@ -221,9 +221,9 @@ app.get('/api/cam/dgx/snapshot', requireAuth, (req, res) => {
     });
 });
 
-// Jetson camera proxy (port 8765 on Jetson)
+// Jetson YOLO camera proxy (port 8766 on Jetson — YOLO overlay)
 app.get('/api/cam/jetson/snapshot', requireAuth, (req, res) => {
-    const camReq = http.get('http://192.168.1.137:8765/snap', (camRes) => {
+    const camReq = http.get('http://192.168.1.137:8766/snap', (camRes) => {
         res.set({
             'Content-Type': 'image/jpeg',
             'Cache-Control': 'no-cache, no-store',
@@ -238,6 +238,20 @@ app.get('/api/cam/jetson/snapshot', requireAuth, (req, res) => {
         camReq.destroy();
         res.status(504).json({ error: 'Jetson camera timeout' });
     });
+});
+
+// Jetson YOLO detections API
+app.get('/api/cam/jetson/detections', requireAuth, (req, res) => {
+    const camReq = http.get('http://192.168.1.137:8766/detections', (camRes) => {
+        let data = '';
+        camRes.on('data', chunk => data += chunk);
+        camRes.on('end', () => {
+            res.set('Content-Type', 'application/json');
+            res.send(data);
+        });
+    });
+    camReq.on('error', () => res.status(503).json({ error: 'Jetson offline' }));
+    camReq.setTimeout(3000, () => { camReq.destroy(); res.status(504).json({ error: 'timeout' }); });
 });
 
 // Protected static files — index.html is the main hub
