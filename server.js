@@ -214,6 +214,111 @@ app.get('/api/strategies', requireAuth, (req, res) => {
 
 // === DATABASE PROXY ROUTES ===
 
+// Pife schema proxy helper
+function pifeProxy(endpoint, method = 'GET') {
+    return (req, res) => {
+        const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+        const options = {
+            hostname: '127.0.0.1',
+            port: 3001,
+            path: endpoint + queryString,
+            method: method || req.method,
+            headers: {
+                'Accept-Profile': 'pife',
+                'Content-Profile': 'pife',
+                'Content-Type': 'application/json'
+            }
+        };
+
+        // Handle POST/PATCH body
+        const data = (method === 'POST' || method === 'PATCH') && req.body ? JSON.stringify(req.body) : null;
+        if (data) {
+            options.headers['Content-Length'] = Buffer.byteLength(data);
+            options.headers['Prefer'] = 'return=representation';
+        }
+
+        const reqProxy = http.request(options, (proxyRes) => {
+            let body = '';
+            proxyRes.on('data', chunk => body += chunk);
+            proxyRes.on('end', () => {
+                res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+            });
+        });
+
+        reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+        reqProxy.setTimeout(5000, () => { reqProxy.destroy(); res.status(504).json({ error: 'timeout' }); });
+
+        if (data) reqProxy.write(data);
+        reqProxy.end();
+    };
+}
+
+// Pife schema routes
+app.get('/api/pife/contacts', requireAuth, pifeProxy('/contacts'));
+app.post('/api/pife/contacts', requireAuth, pifeProxy('/contacts', 'POST'));
+app.patch('/api/pife/contacts/:id', requireAuth, (req, res) => {
+    pifeProxy(`/contacts?id=eq.${req.params.id}`, 'PATCH')(req, res);
+});
+app.delete('/api/pife/contacts/:id', requireAuth, (req, res) => {
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: `/contacts?id=eq.${req.params.id}`,
+        method: 'DELETE',
+        headers: {
+            'Accept-Profile': 'pife',
+            'Content-Profile': 'pife'
+        }
+    };
+    const reqProxy = http.request(options, (proxyRes) => {
+        res.status(proxyRes.statusCode).end();
+    });
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.end();
+});
+
+app.get('/api/pife/invoices', requireAuth, pifeProxy('/invoices'));
+app.post('/api/pife/invoices', requireAuth, pifeProxy('/invoices', 'POST'));
+app.patch('/api/pife/invoices/:id', requireAuth, (req, res) => {
+    pifeProxy(`/invoices?id=eq.${req.params.id}`, 'PATCH')(req, res);
+});
+app.delete('/api/pife/invoices/:id', requireAuth, (req, res) => {
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: `/invoices?id=eq.${req.params.id}`,
+        method: 'DELETE',
+        headers: {
+            'Accept-Profile': 'pife',
+            'Content-Profile': 'pife'
+        }
+    };
+    const reqProxy = http.request(options, (proxyRes) => {
+        res.status(proxyRes.statusCode).end();
+    });
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.end();
+});
+
+app.get('/api/pife/invoice_lines', requireAuth, pifeProxy('/invoice_lines'));
+app.post('/api/pife/invoice_lines', requireAuth, pifeProxy('/invoice_lines', 'POST'));
+
+app.get('/api/pife/bank_accounts', requireAuth, pifeProxy('/bank_accounts'));
+app.post('/api/pife/bank_accounts', requireAuth, pifeProxy('/bank_accounts', 'POST'));
+
+app.get('/api/pife/bank_transactions', requireAuth, pifeProxy('/bank_transactions'));
+app.post('/api/pife/bank_transactions', requireAuth, pifeProxy('/bank_transactions', 'POST'));
+
+app.get('/api/pife/expenses', requireAuth, pifeProxy('/expenses'));
+app.post('/api/pife/expenses', requireAuth, pifeProxy('/expenses', 'POST'));
+
+app.get('/api/pife/business_lines', requireAuth, pifeProxy('/business_lines'));
+
+app.get('/api/pife/contracts', requireAuth, pifeProxy('/contracts'));
+app.post('/api/pife/contracts', requireAuth, pifeProxy('/contracts', 'POST'));
+
+app.get('/api/pife/tax_periods', requireAuth, pifeProxy('/tax_periods'));
+
 // Supabase (PostgREST) - Tasks API
 app.get('/api/tasks', requireAuth, (req, res) => {
     const reqProxy = http.get('http://127.0.0.1:3001/tasks?order=updated_at.desc', (proxyRes) => {
