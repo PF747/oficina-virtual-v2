@@ -489,52 +489,79 @@
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
 
-        // Form submission
-        loginForm.addEventListener('submit', (e) => {
+        // Real API login
+        async function doLogin(username, password, redirect) {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                return {ok: true, role: data.role};
+            }
+            return {ok: false};
+        }
+
+        // Form submission - Normal login
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const username = usernameInput.value.trim();
             const password = passwordInput.value;
-
             if (!username || !password) {
                 showNotification('Por favor, completa todos los campos', 'error');
                 return;
             }
-
-            // Add loading state
             loginBtn.classList.add('loading');
             loginBtn.querySelector('span').textContent = 'Verificando';
-
-            // Simulate authentication
-            setTimeout(() => {
-                // In production, this would be a real API call
-                if (password.length >= 6) {
+            try {
+                const result = await doLogin(username, password);
+                if (result.ok) {
                     showNotification('¡Acceso concedido! Redirigiendo...', 'success');
-                    targetSpeed = 5; // Speed up stars
-                    
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
+                    targetSpeed = 5;
+                    setTimeout(() => { window.location.href = '/'; }, 1200);
                 } else {
                     loginBtn.classList.remove('loading');
                     loginBtn.querySelector('span').textContent = 'Acceder';
                     showNotification('Credenciales inválidas', 'error');
                 }
-            }, 1500);
+            } catch(e) {
+                loginBtn.classList.remove('loading');
+                loginBtn.querySelector('span').textContent = 'Acceder';
+                showNotification('Error de conexión', 'error');
+            }
         });
 
-        // VIP Access button
-        vipBtn.addEventListener('click', () => {
+        // VIP Access button - Goes to Trading Dashboard
+        vipBtn.addEventListener('click', async () => {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            if (!username || !password) {
+                showNotification('Introduce tus credenciales primero', 'error');
+                return;
+            }
             vipBtn.classList.add('loading');
             vipBtn.querySelector('span').textContent = 'Verificando VIP';
             targetSpeed = 5;
-
-            setTimeout(() => {
-                showNotification('¡Acceso VIP concedido! Bienvenido, Director 🦁', 'success');
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1500);
-            }, 1200);
+            try {
+                const result = await doLogin(username, password);
+                if (result.ok && result.role === 'admin') {
+                    showNotification('¡Acceso VIP concedido! Bienvenido, Director 🦁', 'success');
+                    setTimeout(() => { window.location.href = '/trading.html'; }, 1200);
+                } else if (result.ok) {
+                    showNotification('Acceso VIP requiere rol admin', 'error');
+                    vipBtn.classList.remove('loading');
+                    vipBtn.querySelector('span').textContent = '✨ Acceso VIP';
+                } else {
+                    vipBtn.classList.remove('loading');
+                    vipBtn.querySelector('span').textContent = '✨ Acceso VIP';
+                    showNotification('Credenciales inválidas', 'error');
+                }
+            } catch(e) {
+                vipBtn.classList.remove('loading');
+                vipBtn.querySelector('span').textContent = '✨ Acceso VIP';
+                showNotification('Error de conexión', 'error');
+            }
         });
 
         // Notification system
@@ -619,7 +646,7 @@
                 showNotification('🎮 Código Konami activado! Acceso ilimitado concedido', 'success');
                 targetSpeed = 10;
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/trading.html';
                 }, 2000);
             }
         });
