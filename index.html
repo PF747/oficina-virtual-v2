@@ -3,357 +3,233 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>πφe — Oficina Virtual V2</title>
+    <title>πφe — Command Center</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --gold: #f59e0b;
-            --gold-dim: rgba(245,158,11,0.3);
-            --bg: #050510;
-            --panel: rgba(8,12,30,0.85);
-            --border: rgba(245,158,11,0.2);
-            --cyan: #00f0ff;
-            --purple: #b829ff;
-            --green: #00ff88;
-            --red: #ff3366;
-        }
-        html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); font-family:'JetBrains Mono',monospace; color:#c8d6e5; }
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--gold:#f59e0b;--bg:#050510;--panel:rgba(8,12,30,0.85);--border:rgba(245,158,11,0.2);--cyan:#00f0ff;--purple:#b829ff;--green:#00ff88;--red:#ff3366}
+        body{min-height:100vh;background:var(--bg);font-family:'JetBrains Mono',monospace;color:#c8d6e5;overflow-x:hidden}
+        canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+        .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:30px 20px}
+        
+        /* Header */
+        .header{text-align:center;margin-bottom:40px;padding-top:20px}
+        .header h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.3em,4vw,2.2em);font-weight:900;letter-spacing:4px;
+            background:linear-gradient(90deg,var(--gold),#fff,var(--gold));background-size:200% auto;
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite}
+        @keyframes shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+        .header .sub{color:#666;font-size:0.8em;margin-top:8px}
+        .header .user{display:inline-block;margin-top:12px;padding:5px 16px;border-radius:20px;font-size:0.75em;
+            background:rgba(245,158,11,0.12);border:1px solid var(--border);color:var(--gold)}
 
-        /* === TOP NAV BAR === */
-        #topnav {
-            position:fixed; top:0; left:0; right:0; height:52px; z-index:1000;
-            background: linear-gradient(180deg, rgba(5,5,16,0.97) 0%, rgba(5,5,16,0.85) 100%);
-            border-bottom:1px solid var(--border);
-            backdrop-filter: blur(20px);
-            display:flex; align-items:center; justify-content:space-between;
-            padding:0 20px;
-        }
-        #topnav .logo {
-            font-family:'Orbitron',sans-serif; font-weight:800; font-size:1.1em;
-            background: linear-gradient(90deg, var(--gold), #fff, var(--gold));
-            background-size:200% auto;
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-            animation: shimmer 4s linear infinite;
-        }
-        @keyframes shimmer { 0%{background-position:0% center} 100%{background-position:200% center} }
+        /* Cards Grid */
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-bottom:40px}
+        .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px;
+            text-decoration:none;color:inherit;transition:all .3s;position:relative;overflow:hidden;display:block}
+        .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+            background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0.5}
+        .card:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 12px 40px rgba(245,158,11,0.15)}
+        .card:active{transform:translateY(-1px)}
+        .card .icon{font-size:2.5em;margin-bottom:12px;display:block}
+        .card h2{font-family:'Orbitron',sans-serif;font-size:1em;color:#fff;margin-bottom:6px;letter-spacing:1px}
+        .card p{color:#888;font-size:0.78em;line-height:1.6}
+        .card .badge{position:absolute;top:16px;right:16px;padding:3px 10px;border-radius:6px;font-size:0.65em;font-weight:600}
+        .badge-live{background:rgba(0,255,136,0.15);color:var(--green);border:1px solid rgba(0,255,136,0.3)}
+        .badge-3d{background:rgba(0,240,255,0.15);color:var(--cyan);border:1px solid rgba(0,240,255,0.3)}
+        .badge-new{background:rgba(184,41,255,0.15);color:var(--purple);border:1px solid rgba(184,41,255,0.3)}
 
-        #topnav .nav-links { display:flex; gap:4px; }
-        .nav-btn {
-            padding:8px 16px; border-radius:8px; border:1px solid transparent;
-            background:transparent; color:#888; font-family:inherit; font-size:0.8em;
-            cursor:pointer; transition:all .3s; display:flex; align-items:center; gap:6px;
-        }
-        .nav-btn:hover { color:#fff; background:rgba(245,158,11,0.1); border-color:var(--border); }
-        .nav-btn.active { color:var(--gold); background:rgba(245,158,11,0.15); border-color:var(--gold); }
-        .nav-btn .icon { font-size:1.1em; }
+        /* Strategies Section */
+        .section-title{font-family:'Orbitron',sans-serif;font-size:1.1em;color:var(--gold);margin-bottom:20px;
+            letter-spacing:2px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+        .strat-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:30px}
+        .strat-item{background:var(--panel);border:1px solid rgba(255,255,255,0.05);border-radius:10px;
+            padding:14px 16px;cursor:pointer;transition:all .3s;display:flex;align-items:center;gap:12px}
+        .strat-item:hover{border-color:var(--border);background:rgba(245,158,11,0.05)}
+        .strat-num{font-family:'Orbitron',sans-serif;font-size:1.4em;color:rgba(245,158,11,0.2);min-width:36px}
+        .strat-info h4{color:#ddd;font-size:0.82em;margin-bottom:2px}
+        .strat-info span{color:#666;font-size:0.68em}
 
-        .nav-right { display:flex; align-items:center; gap:12px; }
-        .nav-right .clock { font-size:0.75em; color:#666; }
-        .nav-right .user-badge {
-            padding:5px 12px; border-radius:20px; font-size:0.72em;
-            background:rgba(245,158,11,0.15); border:1px solid var(--gold-dim); color:var(--gold);
-        }
-        .btn-logout {
-            padding:5px 10px; border-radius:6px; border:1px solid rgba(255,51,102,0.3);
-            background:transparent; color:var(--red); font-family:inherit; font-size:0.72em;
-            cursor:pointer; transition:all .3s;
-        }
-        .btn-logout:hover { background:rgba(255,51,102,0.15); }
+        /* Modal */
+        .modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);
+            backdrop-filter:blur(8px);z-index:1000;display:none;overflow-y:auto;padding:20px}
+        .modal-bg.show{display:block}
+        .modal{max-width:850px;margin:20px auto;background:#0a0a1a;border:1px solid var(--border);
+            border-radius:16px;padding:30px;position:relative}
+        .modal-close{position:absolute;top:16px;right:20px;font-size:1.8em;color:#555;cursor:pointer;
+            background:none;border:none;transition:color .3s;line-height:1}
+        .modal-close:hover{color:var(--gold)}
+        .modal h2{color:var(--gold);font-family:'Orbitron',sans-serif;font-size:1.1em;margin-bottom:16px}
+        .modal pre{background:#0f0f1a;border:1px solid #1a1a2e;border-radius:8px;padding:14px;
+            overflow-x:auto;font-size:0.78em;color:var(--green);margin:12px 0}
+        .modal code{color:var(--cyan);font-size:0.85em}
+        .modal p,.modal li{line-height:1.7;font-size:0.85em;margin-bottom:6px}
+        .modal h3{color:var(--cyan);margin:18px 0 8px;font-size:0.95em}
+        .modal strong{color:#fff}
+        .modal::-webkit-scrollbar{width:5px}
+        .modal::-webkit-scrollbar-thumb{background:rgba(245,158,11,0.3);border-radius:3px}
 
-        /* === MAIN CONTENT === */
-        #app-frame {
-            position:fixed; top:52px; left:0; right:0; bottom:0;
-            border:none; background:var(--bg);
-        }
-        #app-frame iframe {
-            width:100%; height:100%; border:none;
-        }
+        /* Footer */
+        .footer{text-align:center;padding:20px 0;color:#333;font-size:0.7em}
+        .footer a{color:var(--gold);text-decoration:none}
 
-        /* === STRATEGIES VIEWER === */
-        #strategies-view {
-            position:fixed; top:52px; left:0; right:0; bottom:0;
-            background:var(--bg); overflow-y:auto; display:none; padding:30px;
-        }
-        #strategies-view h1 {
-            font-family:'Orbitron',sans-serif; font-size:1.5em; color:var(--gold);
-            margin-bottom:24px; letter-spacing:3px;
-        }
-        .strat-grid {
-            display:grid; grid-template-columns:repeat(auto-fill, minmax(320px,1fr));
-            gap:16px;
-        }
-        .strat-card {
-            background:var(--panel); border:1px solid var(--border); border-radius:12px;
-            padding:20px; cursor:pointer; transition:all .3s;
-            position:relative; overflow:hidden;
-        }
-        .strat-card::before {
-            content:''; position:absolute; top:0; left:0; right:0; height:2px;
-            background:linear-gradient(90deg, transparent, var(--gold), transparent); opacity:0.5;
-        }
-        .strat-card:hover { border-color:var(--gold); transform:translateY(-2px);
-            box-shadow:0 8px 30px rgba(245,158,11,0.15); }
-        .strat-card .num { font-family:'Orbitron',sans-serif; font-size:2em; color:rgba(245,158,11,0.15);
-            position:absolute; top:10px; right:16px; }
-        .strat-card h3 { color:#fff; font-size:0.95em; margin-bottom:6px; }
-        .strat-card .type { color:var(--cyan); font-size:0.72em; margin-bottom:8px; }
-        .strat-card .desc { color:#888; font-size:0.75em; line-height:1.5; }
-        .strat-tags { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
-        .strat-tag { padding:2px 8px; border-radius:4px; font-size:0.65em;
-            background:rgba(0,240,255,0.1); color:var(--cyan); border:1px solid rgba(0,240,255,0.2); }
-        .strat-tag.risk-low { background:rgba(0,255,136,0.1); color:var(--green); border-color:rgba(0,255,136,0.2); }
-        .strat-tag.risk-high { background:rgba(255,51,102,0.1); color:var(--red); border-color:rgba(255,51,102,0.2); }
-
-        /* === STRATEGY DETAIL MODAL === */
-        #strat-modal {
-            position:fixed; top:0; left:0; right:0; bottom:0; z-index:2000;
-            background:rgba(0,0,0,0.85); backdrop-filter:blur(10px);
-            display:none; align-items:center; justify-content:center; padding:20px;
-        }
-        #strat-modal.show { display:flex; }
-        .modal-content {
-            background:#0a0a1a; border:1px solid var(--border); border-radius:16px;
-            max-width:900px; width:100%; max-height:85vh; overflow-y:auto; padding:30px;
-        }
-        .modal-content h2 { color:var(--gold); font-family:'Orbitron',sans-serif; margin-bottom:16px; }
-        .modal-content pre {
-            background:#12121a; border:1px solid #1e1e2e; border-radius:8px;
-            padding:16px; overflow-x:auto; font-size:0.8em; color:var(--green);
-        }
-        .modal-content code { color:var(--cyan); }
-        .modal-content p, .modal-content li { line-height:1.7; margin-bottom:8px; }
-        .modal-content h3 { color:var(--cyan); margin:16px 0 8px; }
-        .modal-close {
-            position:absolute; top:20px; right:30px; font-size:2em; color:#666;
-            cursor:pointer; z-index:2001; transition:color .3s;
-        }
-        .modal-close:hover { color:var(--gold); }
-        .modal-content::-webkit-scrollbar { width:6px; }
-        .modal-content::-webkit-scrollbar-track { background:#0a0a1a; }
-        .modal-content::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:3px; }
-
-        /* === RESPONSIVE === */
-        @media (max-width:768px) {
-            .nav-btn span.label { display:none; }
-            .nav-right .clock { display:none; }
-            .strat-grid { grid-template-columns:1fr; }
-        }
+        /* Logout */
+        .logout{position:fixed;top:16px;right:16px;z-index:10;padding:6px 14px;border-radius:8px;
+            border:1px solid rgba(255,51,102,0.3);background:rgba(255,51,102,0.08);color:var(--red);
+            font-family:inherit;font-size:0.72em;cursor:pointer;text-decoration:none;transition:all .3s}
+        .logout:hover{background:rgba(255,51,102,0.2)}
     </style>
 </head>
 <body>
-    <!-- TOP NAVIGATION -->
-    <nav id="topnav">
-        <div class="logo">🦁 πφe COMMAND CENTER</div>
-        <div class="nav-links">
-            <button class="nav-btn active" data-view="office" onclick="navigate('office')">
-                <span class="icon">🏢</span><span class="label">Oficina 3D</span>
-            </button>
-            <button class="nav-btn" data-view="trading" onclick="navigate('trading')">
-                <span class="icon">📈</span><span class="label">Trading</span>
-            </button>
-            <button class="nav-btn" data-view="strategies" onclick="navigate('strategies')">
-                <span class="icon">🧠</span><span class="label">Estrategias</span>
-            </button>
-        </div>
-        <div class="nav-right">
-            <span class="clock" id="clock"></span>
-            <span class="user-badge" id="userBadge">👤</span>
-            <button class="btn-logout" onclick="location.href='/logout'">Salir</button>
-        </div>
-    </nav>
+    <canvas id="stars"></canvas>
+    <a href="/logout" class="logout">Salir</a>
 
-    <!-- IFRAME FOR OFFICE & TRADING -->
-    <div id="app-frame">
-        <iframe id="main-iframe" src="/office.html" allow="accelerometer; autoplay; encrypted-media; gyroscope" style="width:100%;height:100%;border:none;"></iframe>
+    <div class="wrap">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>🦁 πφe COMMAND CENTER</h1>
+            <div class="sub">Oficina Virtual V2 — DGX Sparks</div>
+            <div class="user" id="userBadge">Cargando...</div>
+        </div>
+
+        <!-- MAIN APPS -->
+        <div class="grid">
+            <a href="/office.html" class="card">
+                <span class="badge badge-3d">THREE.JS</span>
+                <span class="icon">🏢</span>
+                <h2>OFICINA 3D</h2>
+                <p>Estación espacial con 10 agentes humanoides, escritorios holográficos, áreas VIP y bloom effects. Navega el espacio con OrbitControls.</p>
+            </a>
+            <a href="/trading.html" class="card">
+                <span class="badge badge-live">LIVE DATA</span>
+                <span class="icon">📈</span>
+                <h2>TRADING CENTER</h2>
+                <p>Dashboard estilo Phantom_Defi con velas en tiempo real, order book, posiciones, métricas de riesgo y 20 strategy cards animadas.</p>
+            </a>
+            <a href="#strategies" class="card" onclick="event.preventDefault();document.getElementById('strat-section').scrollIntoView({behavior:'smooth'})">
+                <span class="badge badge-new">20 DOCS</span>
+                <span class="icon">🧠</span>
+                <h2>ESTRATEGIAS</h2>
+                <p>Biblioteca completa de 20 estrategias de trading profesionales con condiciones de entrada/salida, gestión de riesgo y código Python.</p>
+            </a>
+        </div>
+
+        <!-- STRATEGIES -->
+        <div id="strat-section">
+            <div class="section-title">📊 TRADING STRATEGIES LIBRARY</div>
+            <div class="strat-list" id="stratList"></div>
+        </div>
+
+        <div class="footer">πφe Energy 2026 · <a href="https://github.com/PF747/oficina-virtual-v2" target="_blank">GitHub</a></div>
     </div>
 
-    <!-- FALLBACK if iframe doesn't show -->
-    <div id="fallback" style="display:none; position:fixed; top:52px; left:0; right:0; bottom:0; background:#050510; z-index:5; padding:40px; text-align:center;">
-        <h2 style="color:#f59e0b; font-family:'Orbitron',sans-serif; margin-bottom:20px;">🦁 πφe COMMAND CENTER</h2>
-        <p style="color:#888; margin-bottom:30px;">Si no ves la oficina 3D, accede directamente:</p>
-        <div style="display:flex; flex-direction:column; gap:16px; max-width:400px; margin:0 auto;">
-            <a href="/office.html" style="display:block; padding:16px 24px; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; border-radius:12px; color:#f59e0b; text-decoration:none; font-family:'JetBrains Mono',monospace;">🏢 Oficina 3D</a>
-            <a href="/trading.html" style="display:block; padding:16px 24px; background:rgba(0,240,255,0.1); border:1px solid #00f0ff; border-radius:12px; color:#00f0ff; text-decoration:none; font-family:'JetBrains Mono',monospace;">📈 Trading Dashboard</a>
-            <button onclick="navigate('strategies')" style="display:block; padding:16px 24px; background:rgba(184,41,255,0.1); border:1px solid #b829ff; border-radius:12px; color:#b829ff; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:1em;">🧠 Trading Strategies</button>
+    <!-- MODAL -->
+    <div class="modal-bg" id="modal" onclick="if(event.target===this)closeModal()">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div id="modalBody">Cargando...</div>
         </div>
-    </div>
-
-    <!-- STRATEGIES VIEW (inline, not iframe) -->
-    <div id="strategies-view"></div>
-
-    <!-- STRATEGY DETAIL MODAL -->
-    <div id="strat-modal">
-        <span class="modal-close" onclick="closeModal()">×</span>
-        <div class="modal-content" id="modal-body"></div>
     </div>
 
     <script>
-        // === STRATEGIES DATA ===
-        const STRATEGIES = [
-            { num:'01', name:'Momentum Breakout', type:'Trend Following / Breakout', risk:'medium', tags:['Crypto','Futures','Intraday'], file:'01-momentum-breakout.md',
-              desc:'Captures explosive moves when price breaks key levels with volume confirmation.' },
-            { num:'02', name:'Mean Reversion (Bollinger)', type:'Mean Reversion / Counter-Trend', risk:'medium', tags:['All Markets','Swing'], file:'02-mean-reversion-bollinger.md',
-              desc:'Exploits statistical tendency of price to return to its mean after extreme deviations.' },
-            { num:'03', name:'RSI Divergence', type:'Reversal / Momentum', risk:'medium', tags:['All Markets','Swing'], file:'03-rsi-divergence.md',
-              desc:'Identifies hidden strength/weakness through RSI divergence from price action.' },
-            { num:'04', name:'VWAP Scalping', type:'Intraday / Scalping', risk:'medium', tags:['Equities','Futures','Intraday'], file:'04-vwap-scalping.md',
-              desc:'Uses Volume Weighted Average Price as dynamic intraday support/resistance.' },
-            { num:'05', name:'Ichimoku Cloud', type:'Trend Following', risk:'medium', tags:['Forex','Crypto','Swing'], file:'05-ichimoku-cloud.md',
-              desc:'Complete trend-following system using cloud, tenkan-sen, and kijun-sen crossovers.' },
-            { num:'06', name:'Order Flow / Footprint', type:'Microstructure', risk:'high', tags:['Futures','Crypto','Scalping'], file:'06-order-flow-footprint.md',
-              desc:'Reads real buy/sell orders — absorption, delta imbalances, DOM stacking.' },
-            { num:'07', name:'Grid Trading', type:'Range / Automated', risk:'medium', tags:['Crypto','Automated'], file:'07-grid-trading.md',
-              desc:'Places buy/sell orders at grid intervals, profiting from oscillation in ranges.' },
-            { num:'08', name:'Pairs Trading', type:'Statistical Arbitrage', risk:'low', tags:['Equities','Crypto','Market Neutral'], file:'08-pairs-trading.md',
-              desc:'Exploits cointegrated asset pairs — long underperformer, short outperformer.' },
-            { num:'09', name:'Fibonacci Swing', type:'Swing / Trend Continuation', risk:'medium', tags:['All Markets','Swing'], file:'09-fibonacci-retracement-swing.md',
-              desc:'High-probability pullback entries at golden zone (50-61.8%) Fibonacci levels.' },
-            { num:'10', name:'MACD + Volume', type:'Momentum / Trend', risk:'medium', tags:['All Markets','Daily'], file:'10-macd-volume-crossover.md',
-              desc:'Classic MACD crossover enhanced with volume confirmation to eliminate whipsaws.' },
-            { num:'11', name:'Turtle Trading', type:'Trend Following / Breakout', risk:'medium', tags:['Futures','Crypto','Position'], file:'11-turtle-trading.md',
-              desc:'Legendary Donchian Channel breakout system with ATR-based position sizing.' },
-            { num:'12', name:'Opening Range Breakout', type:'Intraday Breakout', risk:'medium', tags:['Equities','Futures','Intraday'], file:'12-opening-range-breakout.md',
-              desc:'Captures the initial directional move from the first 15-30 min trading range.' },
-            { num:'13', name:'Market Making', type:'High Frequency / Spread', risk:'high', tags:['Crypto','Forex','HFT'], file:'13-market-making.md',
-              desc:'Provides liquidity on both sides of the book, capturing bid-ask spread.' },
-            { num:'14', name:'DCA + Momentum', type:'Accumulation / Hybrid', risk:'low', tags:['Crypto','Long-term'], file:'14-dca-momentum-filter.md',
-              desc:'Enhanced dollar cost averaging — buy more in fear, reduce in confirmed downtrends.' },
-            { num:'15', name:'Gamma Scalping', type:'Volatility / Options', risk:'medium', tags:['Options','Delta-Neutral'], file:'15-gamma-scalping.md',
-              desc:'Profits from realized > implied volatility via long gamma + continuous delta hedging.' },
-            { num:'16', name:'Funding Rate Carry', type:'Arbitrage / Income', risk:'low', tags:['Crypto','Perpetuals','Income'], file:'16-carry-trade-funding.md',
-              desc:'Delta-neutral carry: long spot + short perp, earning funding rate payments.' },
-            { num:'17', name:'Liquidation Hunting', type:'Microstructure / Predatory', risk:'high', tags:['Crypto','Leveraged','Intraday'], file:'17-liquidation-hunting.md',
-              desc:'Identifies liquidation clusters and positions for cascading forced-order moves.' },
-            { num:'18', name:'Wyckoff Method', type:'Structural / Price Action', risk:'medium', tags:['All Markets','Position'], file:'18-wyckoff-method.md',
-              desc:'Reads accumulation/distribution phases — enters at Springs and Upthrusts.' },
-            { num:'19', name:'Elliott Wave + RSI', type:'Wave Analysis / Reversal', risk:'high', tags:['All Markets','Swing'], file:'19-elliott-wave-rsi.md',
-              desc:'Wave counting with RSI divergence confirmation at Wave 3 and Wave 5.' },
-            { num:'20', name:'ML Ensemble Signal', type:'Machine Learning / Quant', risk:'medium', tags:['Quant','Automated','All Markets'], file:'20-ml-ensemble-signal.md',
-              desc:'Random Forest + LSTM + XGBoost ensemble with walk-forward optimization.' }
-        ];
+    // === STRATEGIES DATA ===
+    const S=[
+        {n:'01',name:'Momentum Breakout',type:'Trend / Breakout'},
+        {n:'02',name:'Mean Reversion (Bollinger)',type:'Counter-Trend'},
+        {n:'03',name:'RSI Divergence',type:'Reversal / Momentum'},
+        {n:'04',name:'VWAP Scalping',type:'Intraday'},
+        {n:'05',name:'Ichimoku Cloud',type:'Trend Following'},
+        {n:'06',name:'Order Flow / Footprint',type:'Microstructure'},
+        {n:'07',name:'Grid Trading',type:'Range / Automated'},
+        {n:'08',name:'Pairs Trading',type:'Statistical Arb'},
+        {n:'09',name:'Fibonacci Swing',type:'Trend Continuation'},
+        {n:'10',name:'MACD + Volume',type:'Momentum'},
+        {n:'11',name:'Turtle Trading',type:'Trend / Breakout'},
+        {n:'12',name:'Opening Range Breakout',type:'Intraday'},
+        {n:'13',name:'Market Making',type:'HFT / Spread'},
+        {n:'14',name:'DCA + Momentum',type:'Accumulation'},
+        {n:'15',name:'Gamma Scalping',type:'Volatility / Options'},
+        {n:'16',name:'Funding Rate Carry',type:'Arbitrage'},
+        {n:'17',name:'Liquidation Hunting',type:'Predatory'},
+        {n:'18',name:'Wyckoff Method',type:'Price Action'},
+        {n:'19',name:'Elliott Wave + RSI',type:'Wave Analysis'},
+        {n:'20',name:'ML Ensemble Signal',type:'Machine Learning'}
+    ];
 
-        // === NAVIGATION ===
-        let currentView = 'office';
+    // Render strategy list
+    const list=document.getElementById('stratList');
+    S.forEach(s=>{
+        const el=document.createElement('div');
+        el.className='strat-item';
+        el.innerHTML=`<span class="strat-num">${s.n}</span><div class="strat-info"><h4>${s.name}</h4><span>${s.type}</span></div>`;
+        el.onclick=()=>openStrategy(s.n,s.name);
+        list.appendChild(el);
+    });
 
-        function navigate(view) {
-            currentView = view;
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector(`.nav-btn[data-view="${view}"]`).classList.add('active');
-
-            const frame = document.getElementById('app-frame');
-            const stratView = document.getElementById('strategies-view');
-            const iframe = document.getElementById('main-iframe');
-
-            if (view === 'office') {
-                frame.style.display = 'block';
-                stratView.style.display = 'none';
-                iframe.src = '/office.html';
-            } else if (view === 'trading') {
-                frame.style.display = 'block';
-                stratView.style.display = 'none';
-                iframe.src = '/trading.html';
-            } else if (view === 'strategies') {
-                frame.style.display = 'none';
-                stratView.style.display = 'block';
-                renderStrategies();
+    // Open strategy modal
+    async function openStrategy(num,name){
+        const modal=document.getElementById('modal');
+        const body=document.getElementById('modalBody');
+        body.innerHTML='<p style="color:var(--gold)">Cargando estrategia...</p>';
+        modal.classList.add('show');
+        document.body.style.overflow='hidden';
+        try{
+            const file=S.find(s=>s.n===num);
+            const fname=num+'-'+file.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+$/,'')+'.md';
+            // Try the API first, fallback to listing
+            let res=await fetch('/api/strategy/'+fname);
+            if(!res.ok){
+                // Try to find the right filename from the API
+                const list=await fetch('/api/strategies').then(r=>r.json());
+                const match=list.strategies.find(f=>f.startsWith(num+'-'));
+                if(match) res=await fetch('/api/strategy/'+match);
             }
+            if(!res.ok) throw new Error('Not found');
+            const md=await res.text();
+            body.innerHTML=renderMd(md);
+        }catch(e){
+            body.innerHTML=`<h2>${name}</h2><p style="color:var(--red)">No se pudo cargar. Error: ${e.message}</p>`;
         }
+    }
 
-        // === RENDER STRATEGIES ===
-        function renderStrategies() {
-            const container = document.getElementById('strategies-view');
-            container.innerHTML = `
-                <h1>📊 TRADING STRATEGIES</h1>
-                <p style="color:#888;margin-bottom:24px;font-size:0.85em;">
-                    20 estrategias profesionales con entry/exit conditions, risk management y código Python.
-                </p>
-                <div class="strat-grid">
-                    ${STRATEGIES.map(s => `
-                        <div class="strat-card" onclick="openStrategy('${s.file}','${s.name}')">
-                            <span class="num">${s.num}</span>
-                            <h3>${s.name}</h3>
-                            <div class="type">${s.type}</div>
-                            <div class="desc">${s.desc}</div>
-                            <div class="strat-tags">
-                                ${s.tags.map(t => `<span class="strat-tag">${t}</span>`).join('')}
-                                <span class="strat-tag ${s.risk === 'low' ? 'risk-low' : s.risk === 'high' ? 'risk-high' : ''}">${s.risk.toUpperCase()} RISK</span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-        }
+    function closeModal(){
+        document.getElementById('modal').classList.remove('show');
+        document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
-        // === OPEN STRATEGY DETAIL ===
-        async function openStrategy(file, name) {
-            const modal = document.getElementById('strat-modal');
-            const body = document.getElementById('modal-body');
-            body.innerHTML = '<p style="color:var(--gold);">Cargando...</p>';
-            modal.classList.add('show');
+    // Simple markdown renderer
+    function renderMd(md){
+        return md
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/```(\w+)?\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>')
+            .replace(/^### (.*$)/gm,'<h3>$1</h3>')
+            .replace(/^## (.*$)/gm,'<h2 style="color:var(--gold);margin-top:20px">$1</h2>')
+            .replace(/^# (.*$)/gm,'<h2 style="color:var(--gold);font-size:1.3em">$1</h2>')
+            .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+            .replace(/`(.*?)`/g,'<code>$1</code>')
+            .replace(/^\- (.*$)/gm,'<li>$1</li>')
+            .replace(/^\d+\. (.*$)/gm,'<li>$1</li>')
+            .replace(/\n\n/g,'<br><br>')
+            .replace(/\n/g,'<br>');
+    }
 
-            try {
-                const res = await fetch(`/api/strategy/${file}`);
-                if (!res.ok) throw new Error('Not found');
-                const md = await res.text();
-                body.innerHTML = renderMarkdown(md);
-            } catch(e) {
-                body.innerHTML = `<h2>${name}</h2><p style="color:var(--red);">No se pudo cargar el archivo. Verifica que las estrategias estén en el servidor.</p>`;
-            }
-        }
+    // User badge
+    fetch('/api/status').then(r=>r.json()).then(d=>{
+        if(d.user) document.getElementById('userBadge').textContent='👤 '+d.user.username+' ('+d.user.role+')';
+    }).catch(()=>{});
 
-        function closeModal() {
-            document.getElementById('strat-modal').classList.remove('show');
-        }
-
-        // Close modal on ESC
-        document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
-
-        // === SIMPLE MARKDOWN RENDERER ===
-        function renderMarkdown(md) {
-            return md
-                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-                .replace(/^## (.*$)/gm, '<h2 style="color:var(--gold);margin-top:24px;">$1</h2>')
-                .replace(/^# (.*$)/gm, '<h2 style="color:var(--gold);font-size:1.5em;">$1</h2>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#fff;">$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code>$1</code>')
-                .replace(/^\- (.*$)/gm, '<li style="margin-left:20px;">$1</li>')
-                .replace(/^\d+\. (.*$)/gm, '<li style="margin-left:20px;">$1</li>')
-                .replace(/\|(.*)\|/g, (match) => {
-                    const cells = match.split('|').filter(c => c.trim());
-                    return '<tr>' + cells.map(c => `<td style="padding:4px 12px;border:1px solid #1e1e2e;">${c.trim()}</td>`).join('') + '</tr>';
-                })
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');
-        }
-
-        // === CLOCK ===
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent = now.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // === FETCH USER INFO ===
-        fetch('/api/status').then(r=>r.json()).then(d => {
-            if(d.user) document.getElementById('userBadge').textContent = `👤 ${d.user.username}`;
-        }).catch(()=>{});
-
-        // === IFRAME FALLBACK ===
-        // If iframe fails to load after 5s, show direct links
-        setTimeout(() => {
-            const iframe = document.getElementById('main-iframe');
-            try {
-                // Check if iframe loaded something
-                if (!iframe.contentWindow || !iframe.contentDocument) throw 'blocked';
-            } catch(e) {
-                document.getElementById('fallback').style.display = 'block';
-                document.getElementById('app-frame').style.display = 'none';
-            }
-        }, 5000);
+    // === STARFIELD BACKGROUND ===
+    (function(){
+        const c=document.getElementById('stars'),ctx=c.getContext('2d');
+        let w,h,stars=[];
+        function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;
+            stars=[];for(let i=0;i<200;i++)stars.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005})}
+        function draw(){ctx.clearRect(0,0,w,h);
+            stars.forEach(s=>{s.a+=s.s;if(s.a>1)s.s=-Math.abs(s.s);if(s.a<0.1)s.s=Math.abs(s.s);
+                ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(245,158,11,${s.a*0.6})`;ctx.fill()});
+            requestAnimationFrame(draw)}
+        resize();draw();window.addEventListener('resize',resize);
+    })();
     </script>
 </body>
 </html>
