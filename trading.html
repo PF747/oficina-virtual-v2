@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>πφe TRADING COMMAND CENTER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #121218;
+            --cyan: #00f0ff;
+            --purple: #b829ff;
+            --green: #00ff88;
+            --red: #ff3366;
+            --glass-bg: rgba(18, 18, 24, 0.6);
+            --glass-border: rgba(0, 240, 255, 0.2);
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-primary);
+            color: #fff;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .top-bar::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, var(--cyan), var(--purple), var(--cyan));
+            background-size: 300% 300%;
+            animation: gradient-border 3s ease infinite;
+            z-index: -1;
+            border-radius: 16px;
+            opacity: 0.5;
+        }
+
+        @keyframes gradient-border {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--cyan));
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s linear infinite;
+            letter-spacing: 2px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+
+        .top-stats {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .top-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .top-stat-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .top-stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--cyan);
+        }
+
+        .btc-price {
+            color: var(--green) !important;
+            text-shadow: 0 0 10px var(--green);
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: var(--cyan);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            color: var(--cyan);
+        }
+
+        /* Portfolio Overview */
+        .portfolio-overview {
+            grid-column: span 12;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+        }
+
+        .portfolio-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .portfolio-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .portfolio-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 36px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px var(--cyan);
+        }
+
+        .portfolio-value.positive {
+            background: linear-gradient(135deg, var(--green), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .portfolio-value.negative {
+            background: linear-gradient(135deg, var(--red), #ff6b9d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Chart Area */
+        .chart-container {
+            grid-column: span 8;
+            min-height: 500px;
+        }
+
+        #mainChart {
+            width: 100%;
+            height: 450px;
+            border-radius: 8px;
+        }
+
+        /* Order Book */
+        .orderbook-container {
+            grid-column: span 4;
+            min-height: 500px;
+        }
+
+        .orderbook {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .orderbook::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .orderbook::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .orderbook::-webkit-scrollbar-thumb {
+            background: var(--cyan);
+            border-radius: 3px;
+        }
+
+        .orderbook-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .orderbook-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            padding: 6px 10px;
+            font-size: 12px;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        .orderbook-row.ask {
+            color: var(--red);
+        }
+
+        .orderbook-row.bid {
+            color: var(--green);
+        }
+
+        .orderbook-row::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: currentColor;
+            opacity: 0.1;
+            border-radius: 4px;
+        }
+
+        .orderbook-row.ask::before {
+            width: var(--depth);
+        }
+
+        .orderbook-row.bid::before {
+            width: var(--depth);
+        }
+
+        /* Positions Table */
+        .positions-container {
+            grid-column: span 12;
+        }
+
+        .positions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .positions-table th {
+            text-align: left;
+            padding: 12px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .positions-table td {
+            padding: 16px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .positions-table tr {
+            transition: all 0.3s ease;
+        }
+
+        .positions-table tbody tr:hover {
+            background: rgba(0, 240, 255, 0.05);
+        }
+
+        .symbol {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            color: var(--cyan);
+        }
+
+        .pnl-positive {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        .pnl-negative {
+            color: var(--red);
+            font-weight: 600;
+        }
+
+        /* Strategies Grid */
+        .strategies-container {
+            grid-column: span 8;
+        }
+
+        .strategies-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .strategy-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .strategy-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .strategy-card:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 240, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .strategy-card:hover::before {
+            opacity: 1;
+        }
+
+        .strategy-name {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .strategy-type {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .strategy-winrate {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--green);
+            margin-bottom: 6px;
+        }
+
+        .strategy-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .strategy-status.active {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--green);
+        }
+
+        .strategy-status.paused {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .strategy-status.testing {
+            background: rgba(184, 41, 255, 0.2);
+            color: var(--purple);
+        }
+
+        /* Risk Metrics */
+        .risk-container {
+            grid-column: span 4;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .gauge-container {
+            position: relative;
+            width: 100%;
+            height: 180px;
+        }
+
+        #drawdownGauge {
+            width: 100%;
+            height: 100%;
+        }
+
+        .risk-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .risk-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .risk-value {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--cyan);
+        }
+
+        /* Activity Log */
+        .activity-container {
+            grid-column: span 12;
+            max-height: 300px;
+        }
+
+        .activity-log {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .activity-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .activity-log::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .activity-log::-webkit-scrollbar-thumb {
+            background: var(--purple);
+            border-radius: 3px;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 12px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 3px solid var(--cyan);
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            animation: slideIn 0.4s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .activity-item:hover {
+            background: rgba(0, 240, 255, 0.05);
+        }
+
+        .activity-time {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            min-width: 60px;
+        }
+
+        .activity-text {
+            color: rgba(255, 255, 255, 0.8);
+            flex: 1;
+        }
+
+        .activity-buy {
+            border-left-color: var(--green);
+        }
+
+        .activity-sell {
+            border-left-color: var(--red);
+        }
+
+        .activity-alert {
+            border-left-color: var(--purple);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .chart-container {
+                grid-column: span 12;
+            }
+            .orderbook-container {
+                grid-column: span 12;
+            }
+            .strategies-container {
+                grid-column: span 12;
+            }
+            .risk-container {
+                grid-column: span 12;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .logo {
+                font-size: 20px;
+            }
+            .portfolio-value {
+                font-size: 24px;
+            }
+            .top-bar {
+                padding: 15px 20px;
+            }
+            .strategies-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+        }
+
+        /* Glow effects */
+        .glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+            }
+            50% {
+                text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+            }
+        }
+
+        /* Loading animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particles"></canvas>
+    
+    <div class="container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="logo">πφe TRADING COMMAND CENTER</div>
+            <div class="top-stats">
+                <div class="top-stat">
+                    <div class="top-stat-label">Live Time</div>
+                    <div class="top-stat-value" id="liveTime">--:--:--</div>
+                </div>
+                <div class="top-stat">
+                    <div class="top-stat-label">BTC/USD</div>
+                    <div class="top-stat-value btc-price glow" id="btcPrice">$0.00</div>
+                </div>
+                <div class="top-stat">
+                    <div class="top-stat-label">24h Change</div>
+                    <div class="top-stat-value" id="btcChange">+0.00%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Overview -->
+        <div class="glass-panel portfolio-overview">
+            <div class="portfolio-stat">
+                <div class="portfolio-label">Total Portfolio Value</div>
+                <div class="portfolio-value glow" id="portfolioValue">$0.00</div>
+            </div>
+            <div class="portfolio-stat">
+                <div class="portfolio-label">Daily P&L</div>
+                <div class="portfolio-value positive glow" id="dailyPnl">+$0.00</div>
+            </div>
+            <div class="portfolio-stat">
+                <div class="portfolio-label">Win Rate</div>
+                <div class="portfolio-value" id="winRate">0%</div>
+            </div>
+            <div class="portfolio-stat">
+                <div class="portfolio-label">Sharpe Ratio</div>
+                <div class="portfolio-value" id="sharpeRatio">0.00</div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Chart -->
+            <div class="glass-panel chart-container">
+                <div class="panel-title">Live Market Chart</div>
+                <canvas id="mainChart"></canvas>
+            </div>
+
+            <!-- Order Book -->
+            <div class="glass-panel orderbook-container">
+                <div class="panel-title">Order Book Depth</div>
+                <div class="orderbook-header">
+                    <div>Price</div>
+                    <div>Size</div>
+                    <div>Total</div>
+                </div>
+                <div class="orderbook" id="orderbook"></div>
+            </div>
+
+            <!-- Positions Table -->
+            <div class="glass-panel positions-container">
+                <div class="panel-title">Open Positions</div>
+                <div style="overflow-x: auto;">
+                    <table class="positions-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Entry</th>
+                                <th>Current</th>
+                                <th>Size</th>
+                                <th>P&L</th>
+                                <th>P&L %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Strategies -->
+            <div class="glass-panel strategies-container">
+                <div class="panel-title">Active Strategies (20)</div>
+                <div class="strategies-grid" id="strategiesGrid"></div>
+            </div>
+
+            <!-- Risk Metrics -->
+            <div class="glass-panel risk-container">
+                <div class="panel-title">Risk Metrics</div>
+                <div class="gauge-container">
+                    <canvas id="drawdownGauge"></canvas>
+                </div>
+                <div class="risk-metric">
+                    <span class="risk-label">Max Drawdown</span>
+                    <span class="risk-value" id="maxDrawdown">-0.00%</span>
+                </div>
+                <div class="risk-metric">
+                    <span class="risk-label">Value at Risk (95%)</span>
+                    <span class="risk-value" id="var95">$0.00</span>
+                </div>
+                <div class="risk-metric">
+                    <span class="risk-label">Portfolio Beta</span>
+                    <span class="risk-value" id="beta">0.00</span>
+                </div>
+                <div class="risk-metric">
+                    <span class="risk-label">Leverage</span>
+                    <span class="risk-value" id="leverage">0.00x</span>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="glass-panel activity-container">
+                <div class="panel-title">Recent Activity</div>
+                <div class="activity-log" id="activityLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Particle Background
+        const particleCanvas = document.getElementById('particles');
+        const particleCtx = particleCanvas.getContext('2d');
+        particleCanvas.width = window.innerWidth;
+        particleCanvas.height = window.innerHeight;
+
+        const particles = [];
+        const particleCount = 80;
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * particleCanvas.width;
+                this.y = Math.random() * particleCanvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                this.opacity = Math.random() * 0.5 + 0.2;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x > particleCanvas.width) this.x = 0;
+                if (this.x < 0) this.x = particleCanvas.width;
+                if (this.y > particleCanvas.height) this.y = 0;
+                if (this.y < 0) this.y = particleCanvas.height;
+            }
+
+            draw() {
+                particleCtx.fillStyle = `rgba(0, 240, 255, ${this.opacity})`;
+                particleCtx.beginPath();
+                particleCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                particleCtx.fill();
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+            
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+
+            // Draw connections
+            particles.forEach((p1, i) => {
+                particles.slice(i + 1).forEach(p2 => {
+                    const dx = p1.x - p2.x;
+                    const dy = p1.y - p2.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 150) {
+                        particleCtx.strokeStyle = `rgba(0, 240, 255, ${0.1 * (1 - distance / 150)})`;
+                        particleCtx.lineWidth = 0.5;
+                        particleCtx.beginPath();
+                        particleCtx.moveTo(p1.x, p1.y);
+                        particleCtx.lineTo(p2.x, p2.y);
+                        particleCtx.stroke();
+                    }
+                });
+            });
+
+            requestAnimationFrame(animateParticles);
+        }
+
+        animateParticles();
+
+        window.addEventListener('resize', () => {
+            particleCanvas.width = window.innerWidth;
+            particleCanvas.height = window.innerHeight;
+        });
+
+        // Live Clock
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('liveTime').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // BTC Price Simulation
+        let btcPrice = 67842.50;
+        let btcChangePercent = 2.34;
+
+        function updateBTCPrice() {
+            const change = (Math.random() - 0.5) * 100;
+            btcPrice += change;
+            btcChangePercent = ((btcPrice - 67000) / 67000) * 100;
+            
+            document.getElementById('btcPrice').textContent = `$${btcPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+            document.getElementById('btcChange').textContent = `${btcChangePercent >= 0 ? '+' : ''}${btcChangePercent.toFixed(2)}%`;
+            document.getElementById('btcChange').style.color = btcChangePercent >= 0 ? '#00ff88' : '#ff3366';
+        }
+        setInterval(updateBTCPrice, 3000);
+        updateBTCPrice();
+
+        // Portfolio Overview
+        let portfolioValue = 1847320.45;
+        let dailyPnl = 43287.92;
+        const winRate = 73.8;
+        const sharpeRatio = 2.45;
+
+        function updatePortfolio() {
+            const pnlChange = (Math.random() - 0.4) * 1000;
+            dailyPnl += pnlChange;
+            portfolioValue += pnlChange;
+
+            document.getElementById('portfolioValue').textContent = `$${portfolioValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+            
+            const pnlElement = document.getElementById('dailyPnl');
+            pnlElement.textContent = `${dailyPnl >= 0 ? '+' : ''}$${Math.abs(dailyPnl).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+            pnlElement.className = dailyPnl >= 0 ? 'portfolio-value positive glow' : 'portfolio-value negative glow';
+
+            document.getElementById('winRate').textContent = `${winRate.toFixed(1)}%`;
+            document.getElementById('sharpeRatio').textContent = sharpeRatio.toFixed(2);
+        }
+        setInterval(updatePortfolio, 2000);
+        updatePortfolio();
+
+        // Candlestick Chart
+        const chartCanvas = document.getElementById('mainChart');
+        const chartCtx = chartCanvas.getContext('2d');
+        chartCanvas.width = chartCanvas.offsetWidth;
+        chartCanvas.height = chartCanvas.offsetHeight;
+
+        let chartData = [];
+        const maxCandles = 80;
+        let currentPrice = 67500;
+
+        function generateCandle() {
+            const volatility = 200;
+            const trend = 10;
+            
+            const open = currentPrice;
+            const close = open + (Math.random() - 0.45) * volatility + trend;
+            const high = Math.max(open, close) + Math.random() * volatility * 0.3;
+            const low = Math.min(open, close) - Math.random() * volatility * 0.3;
+            const volume = Math.random() * 1000 + 200;
+
+            currentPrice = close;
+
+            return { open, high, low, close, volume };
+        }
+
+        // Initialize chart data
+        for (let i = 0; i < maxCandles; i++) {
+            chartData.push(generateCandle());
+        }
+
+        function drawChart() {
+            chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+
+            const chartHeight = chartCanvas.height * 0.7;
+            const volumeHeight = chartCanvas.height * 0.25;
+            const padding = 40;
+            const candleWidth = (chartCanvas.width - padding * 2) / maxCandles;
+
+            // Find min/max
+            const prices = chartData.flatMap(c => [c.high, c.low]);
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+            const priceRange = maxPrice - minPrice;
+
+            const maxVolume = Math.max(...chartData.map(c => c.volume));
+
+            // Draw grid
+            chartCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            chartCtx.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                const y = padding + (chartHeight / 4) * i;
+                chartCtx.beginPath();
+                chartCtx.moveTo(padding, y);
+                chartCtx.lineTo(chartCanvas.width - padding, y);
+                chartCtx.stroke();
+
+                // Price labels
+                const price = maxPrice - (priceRange / 4) * i;
+                chartCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                chartCtx.font = '10px JetBrains Mono';
+                chartCtx.textAlign = 'right';
+                chartCtx.fillText(`$${price.toFixed(0)}`, padding - 5, y + 3);
+            }
+
+            // Draw candles
+            chartData.forEach((candle, i) => {
+                const x = padding + i * candleWidth + candleWidth / 2;
+                
+                const openY = padding + ((maxPrice - candle.open) / priceRange) * chartHeight;
+                const closeY = padding + ((maxPrice - candle.close) / priceRange) * chartHeight;
+                const highY = padding + ((maxPrice - candle.high) / priceRange) * chartHeight;
+                const lowY = padding + ((maxPrice - candle.low) / priceRange) * chartHeight;
+
+                const isGreen = candle.close >= candle.open;
+                chartCtx.strokeStyle = isGreen ? '#00ff88' : '#ff3366';
+                chartCtx.fillStyle = isGreen ? '#00ff88' : '#ff3366';
+
+                // Wick
+                chartCtx.beginPath();
+                chartCtx.moveTo(x, highY);
+                chartCtx.lineTo(x, lowY);
+                chartCtx.lineWidth = 1;
+                chartCtx.stroke();
+
+                // Body
+                const bodyHeight = Math.abs(closeY - openY);
+                const bodyY = Math.min(openY, closeY);
+                chartCtx.fillRect(x - candleWidth * 0.3, bodyY, candleWidth * 0.6, Math.max(bodyHeight, 1));
+
+                // Volume bar
+                const volumeY = chartCanvas.height - padding;
+                const volumeBarHeight = (candle.volume / maxVolume) * volumeHeight;
+                chartCtx.fillStyle = isGreen ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 51, 102, 0.3)';
+                chartCtx.fillRect(x - candleWidth * 0.3, volumeY - volumeBarHeight, candleWidth * 0.6, volumeBarHeight);
+            });
+
+            // Current price line
+            const currentY = padding + ((maxPrice - currentPrice) / priceRange) * chartHeight;
+            chartCtx.strokeStyle = '#00f0ff';
+            chartCtx.lineWidth = 1;
+            chartCtx.setLineDash([5, 5]);
+            chartCtx.beginPath();
+            chartCtx.moveTo(padding, currentY);
+            chartCtx.lineTo(chartCanvas.width - padding, currentY);
+            chartCtx.stroke();
+            chartCtx.setLineDash([]);
+
+            // Current price label
+            chartCtx.fillStyle = '#00f0ff';
+            chartCtx.fillRect(chartCanvas.width - padding - 80, currentY - 10, 75, 20);
+            chartCtx.fillStyle = '#0a0a0f';
+            chartCtx.font = 'bold 11px JetBrains Mono';
+            chartCtx.textAlign = 'center';
+            chartCtx.fillText(`$${currentPrice.toFixed(2)}`, chartCanvas.width - padding - 42.5, currentY + 3);
+        }
+
+        function updateChart() {
+            chartData.push(generateCandle());
+            if (chartData.length > maxCandles) {
+                chartData.shift();
+            }
+            drawChart();
+        }
+
+        setInterval(updateChart, 2000);
+        drawChart();
+
+        // Order Book
+        function generateOrderBook() {
+            const orderbook = document.getElementById('orderbook');
+            orderbook.innerHTML = '';
+
+            const basePrice = btcPrice;
+            const spread = 50;
+
+            // Asks (red)
+            for (let i = 10; i >= 1; i--) {
+                const price = basePrice + spread * i;
+                const size = (Math.random() * 2 + 0.5).toFixed(3);
+                const total = (price * size).toFixed(2);
+                const depth = Math.random() * 80 + 20;
+
+                const row = document.createElement('div');
+                row.className = 'orderbook-row ask';
+                row.style.setProperty('--depth', `${depth}%`);
+                row.innerHTML = `
+                    <div>${price.toFixed(2)}</div>
+                    <div>${size}</div>
+                    <div>${total}</div>
+                `;
+                orderbook.appendChild(row);
+            }
+
+            // Spread indicator
+            const spreadRow = document.createElement('div');
+            spreadRow.style.cssText = 'text-align: center; padding: 8px; font-size: 11px; color: rgba(255,255,255,0.5);';
+            spreadRow.textContent = `Spread: $${(spread * 2).toFixed(2)}`;
+            orderbook.appendChild(spreadRow);
+
+            // Bids (green)
+            for (let i = 1; i <= 10; i++) {
+                const price = basePrice - spread * i;
+                const size = (Math.random() * 2 + 0.5).toFixed(3);
+                const total = (price * size).toFixed(2);
+                const depth = Math.random() * 80 + 20;
+
+                const row = document.createElement('div');
+                row.className = 'orderbook-row bid';
+                row.style.setProperty('--depth', `${depth}%`);
+                row.innerHTML = `
+                    <div>${price.toFixed(2)}</div>
+                    <div>${size}</div>
+                    <div>${total}</div>
+                `;
+                orderbook.appendChild(row);
+            }
+        }
+
+        setInterval(generateOrderBook, 3000);
+        generateOrderBook();
+
+        // Positions Table
+        const positions = [
+            { symbol: 'BTC/USDT', type: 'LONG', entry: 66420.50, size: 0.45, current: 67842.50 },
+            { symbol: 'ETH/USDT', type: 'LONG', entry: 3245.20, size: 8.2, current: 3312.80 },
+            { symbol: 'SOL/USDT', type: 'SHORT', entry: 142.80, size: 120, current: 138.40 },
+            { symbol: 'AVAX/USDT', type: 'LONG', entry: 38.45, size: 350, current: 39.20 },
+            { symbol: 'MATIC/USDT', type: 'SHORT', entry: 0.92, size: 15000, current: 0.94 },
+            { symbol: 'ARB/USDT', type: 'LONG', entry: 1.85, size: 4500, current: 1.92 },
+            { symbol: 'OP/USDT', type: 'LONG', entry: 2.34, size: 2800, current: 2.41 },
+            { symbol: 'LINK/USDT', type: 'SHORT', entry: 18.90, size: 420, current: 18.12 }
+        ];
+
+        function updatePositions() {
+            const tbody = document.getElementById('positionsTable');
+            tbody.innerHTML = '';
+
+            positions.forEach(pos => {
+                // Simulate price movement
+                pos.current += (Math.random() - 0.5) * (pos.current * 0.002);
+
+                const pnlDollar = pos.type === 'LONG' 
+                    ? (pos.current - pos.entry) * pos.size 
+                    : (pos.entry - pos.current) * pos.size;
+                
+                const pnlPercent = ((pos.current - pos.entry) / pos.entry) * 100 * (pos.type === 'LONG' ? 1 : -1);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><span class="symbol">${pos.symbol}</span></td>
+                    <td>${pos.type}</td>
+                    <td>$${pos.entry.toFixed(2)}</td>
+                    <td>$${pos.current.toFixed(2)}</td>
+                    <td>${pos.size}</td>
+                    <td class="${pnlDollar >= 0 ? 'pnl-positive' : 'pnl-negative'}">
+                        ${pnlDollar >= 0 ? '+' : ''}$${pnlDollar.toFixed(2)}
+                    </td>
+                    <td class="${pnlPercent >= 0 ? 'pnl-positive' : 'pnl-negative'}">
+                        ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        setInterval(updatePositions, 2000);
+        updatePositions();
+
+        // Strategies Grid
+        const strategies = [
+            { name: 'Mean Reversion Alpha', type: 'Statistical', winRate: 76.3, status: 'active' },
+            { name: 'Momentum Breakout', type: 'Trend', winRate: 68.9, status: 'active' },
+            { name: 'Grid Trading Pro', type: 'Market Making', winRate: 82.1, status: 'active' },
+            { name: 'Arbitrage Scanner', type: 'Arbitrage', winRate: 91.4, status: 'active' },
+            { name: 'ML Price Predictor', type: 'ML/AI', winRate: 73.2, status: 'testing' },
+            { name: 'Volatility Harvester', type: 'Options', winRate: 64.8, status: 'active' },
+            { name: 'Cross-Exchange Arb', type: 'Arbitrage', winRate: 88.6, status: 'active' },
+            { name: 'Funding Rate Farmer', type: 'Yield', winRate: 79.5, status: 'active' },
+            { name: 'Liquidation Hunter', type: 'Contrarian', winRate: 71.2, status: 'active' },
+            { name: 'Order Flow Imbalance', type: 'Microstructure', winRate: 66.7, status: 'testing' },
+            { name: 'Delta Neutral Spread', type: 'Options', winRate: 85.3, status: 'active' },
+            { name: 'News Sentiment Bot', type: 'ML/AI', winRate: 59.8, status: 'paused' },
+            { name: 'TWAP Execution', type: 'Execution', winRate: 94.2, status: 'active' },
+            { name: 'Statistical Arbitrage', type: 'Statistical', winRate: 77.9, status: 'active' },
+            { name: 'Perpetual Basis Trade', type: 'Yield', winRate: 83.4, status: 'active' },
+            { name: 'Smart Order Router', type: 'Execution', winRate: 89.1, status: 'active' },
+            { name: 'Gamma Scalping', type: 'Options', winRate: 62.5, status: 'testing' },
+            { name: 'High-Frequency Scalper', type: 'HFT', winRate: 58.3, status: 'paused' },
+            { name: 'Pairs Trading Engine', type: 'Statistical', winRate: 74.6, status: 'active' },
+            { name: 'Whale Wallet Tracker', type: 'On-Chain', winRate: 69.4, status: 'active' }
+        ];
+
+        function renderStrategies() {
+            const grid = document.getElementById('strategiesGrid');
+            grid.innerHTML = '';
+
+            strategies.forEach(strategy => {
+                const card = document.createElement('div');
+                card.className = 'strategy-card';
+                card.innerHTML = `
+                    <div class="strategy-name">${strategy.name}</div>
+                    <div class="strategy-type">${strategy.type}</div>
+                    <div class="strategy-winrate">${strategy.winRate.toFixed(1)}%</div>
+                    <span class="strategy-status ${strategy.status}">${strategy.status}</span>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        renderStrategies();
+
+        // Drawdown Gauge
+        const gaugeCanvas = document.getElementById('drawdownGauge');
+        const gaugeCtx = gaugeCanvas.getContext('2d');
+        gaugeCanvas.width = gaugeCanvas.offsetWidth;
+        gaugeCanvas.height = gaugeCanvas.offsetHeight;
+
+        let currentDrawdown = 12.5;
+
+        function drawGauge() {
+            const centerX = gaugeCanvas.width / 2;
+            const centerY = gaugeCanvas.height - 20;
+            const radius = Math.min(centerX, centerY) - 10;
+
+            gaugeCtx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
+
+            // Background arc
+            gaugeCtx.beginPath();
+            gaugeCtx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI);
+            gaugeCtx.lineWidth = 20;
+            gaugeCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            gaugeCtx.stroke();
+
+            // Value arc
+            const drawdownPercent = currentDrawdown / 50; // Max 50% drawdown scale
+            const endAngle = Math.PI + (Math.PI * drawdownPercent);
+            
+            const gradient = gaugeCtx.createLinearGradient(0, 0, gaugeCanvas.width, 0);
+            gradient.addColorStop(0, '#00ff88');
+            gradient.addColorStop(0.5, '#00f0ff');
+            gradient.addColorStop(1, '#ff3366');
+
+            gaugeCtx.beginPath();
+            gaugeCtx.arc(centerX, centerY, radius, Math.PI, endAngle);
+            gaugeCtx.lineWidth = 20;
+            gaugeCtx.strokeStyle = gradient;
+            gaugeCtx.lineCap = 'round';
+            gaugeCtx.stroke();
+
+            // Center text
+            gaugeCtx.fillStyle = '#fff';
+            gaugeCtx.font = 'bold 32px Orbitron';
+            gaugeCtx.textAlign = 'center';
+            gaugeCtx.fillText(`${currentDrawdown.toFixed(1)}%`, centerX, centerY - 10);
+            
+            gaugeCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            gaugeCtx.font = '12px JetBrains Mono';
+            gaugeCtx.fillText('DRAWDOWN', centerX, centerY + 15);
+        }
+
+        function updateDrawdown() {
+            currentDrawdown += (Math.random() - 0.5) * 0.5;
+            currentDrawdown = Math.max(0, Math.min(currentDrawdown, 50));
+            drawGauge();
+        }
+
+        setInterval(updateDrawdown, 3000);
+        drawGauge();
+
+        // Risk Metrics
+        document.getElementById('maxDrawdown').textContent = '-15.3%';
+        document.getElementById('var95').textContent = '$42,380';
+        document.getElementById('beta').textContent = '1.23';
+        document.getElementById('leverage').textContent = '2.4x';
+
+        // Activity Log
+        const activities = [];
+        const activityTypes = [
+            { text: 'Opened LONG position on BTC/USDT @ $67,842', class: 'activity-buy' },
+            { text: 'Closed SHORT position on ETH/USDT (+$2,340 P&L)', class: 'activity-sell' },
+            { text: 'Grid Trading Pro executed 15 orders', class: '' },
+            { text: 'Stop loss triggered on SOL/USDT (-$840)', class: 'activity-sell' },
+            { text: 'Arbitrage opportunity detected: 0.3% spread', class: 'activity-alert' },
+            { text: 'Funding rate payment received: +$127', class: 'activity-buy' },
+            { text: 'Rebalanced portfolio allocation', class: '' },
+            { text: 'High volatility alert: BTC 24h vol > 5%', class: 'activity-alert' },
+            { text: 'Liquidation avoided: margin increased', class: 'activity-alert' },
+            { text: 'Mean Reversion Alpha triggered entry signal', class: 'activity-buy' }
+        ];
+
+        function addActivity() {
+            const activity = activityTypes[Math.floor(Math.random() * activityTypes.length)];
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            
+            const item = document.createElement('div');
+            item.className = `activity-item ${activity.class}`;
+            item.innerHTML = `
+                <div class="activity-time">${timeStr}</div>
+                <div class="activity-text">${activity.text}</div>
+            `;
+            
+            const log = document.getElementById('activityLog');
+            log.insertBefore(item, log.firstChild);
+            
+            activities.push(item);
+            if (activities.length > 20) {
+                const removed = activities.shift();
+                removed.remove();
+            }
+        }
+
+        // Initialize with some activities
+        for (let i = 0; i < 10; i++) {
+            setTimeout(addActivity, i * 500);
+        }
+
+        // Add new activities periodically
+        setInterval(addActivity, 8000);
+
+        // Window resize handling
+        window.addEventListener('resize', () => {
+            chartCanvas.width = chartCanvas.offsetWidth;
+            chartCanvas.height = chartCanvas.offsetHeight;
+            drawChart();
+
+            gaugeCanvas.width = gaugeCanvas.offsetWidth;
+            gaugeCanvas.height = gaugeCanvas.offsetHeight;
+            drawGauge();
+        });
+    </script>
+</body>
+</html>
