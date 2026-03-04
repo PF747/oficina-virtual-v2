@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban — πφe Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--gold:#f59e0b;--bg:#050510;--panel:rgba(8,12,30,0.85);--border:rgba(245,158,11,0.2);
+            --cyan:#00f0ff;--purple:#b829ff;--green:#00ff88;--red:#ff3366}
+        body{min-height:100vh;background:var(--bg);font-family:'JetBrains Mono',monospace;color:#c8d6e5;overflow-x:hidden}
+        canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+        .wrap{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:20px}
+        
+        /* Top nav */
+        .topnav{display:flex;justify-content:space-between;align-items:center;padding:16px 0;margin-bottom:20px;
+            border-bottom:1px solid var(--border)}
+        .topnav h1{font-family:'Orbitron',sans-serif;font-size:1.4em;color:var(--gold);letter-spacing:2px}
+        .navlinks{display:flex;gap:12px;align-items:center}
+        .navlinks a{padding:6px 14px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);
+            background:rgba(255,255,255,0.02);color:#888;text-decoration:none;font-size:0.75em;transition:all .3s}
+        .navlinks a:hover{border-color:var(--gold);color:var(--gold)}
+        .navlinks a.active{border-color:var(--gold);color:var(--gold);background:rgba(245,158,11,0.1)}
+        
+        /* Action bar */
+        .actions{display:flex;gap:10px;margin-bottom:20px}
+        .btn{padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:var(--panel);
+            color:var(--gold);font-family:inherit;font-size:0.85em;cursor:pointer;transition:all .3s}
+        .btn:hover{background:rgba(245,158,11,0.15);border-color:var(--gold)}
+        .btn-primary{background:rgba(245,158,11,0.12);border-color:var(--gold)}
+        
+        /* Kanban board */
+        .board{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;min-height:70vh}
+        .column{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;
+            display:flex;flex-direction:column}
+        .column-header{font-family:'Orbitron',sans-serif;font-size:0.85em;color:#ddd;margin-bottom:12px;
+            padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between}
+        .column-count{color:#666;font-size:0.8em;font-weight:400}
+        .tasks{flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:200px}
+        .tasks::-webkit-scrollbar{width:4px}
+        .tasks::-webkit-scrollbar-thumb{background:rgba(245,158,11,0.2);border-radius:2px}
+        
+        /* Task cards */
+        .task{background:#0a0a1a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px;
+            cursor:grab;transition:all .3s;position:relative}
+        .task:hover{border-color:var(--border);transform:translateY(-2px)}
+        .task.dragging{opacity:0.5;cursor:grabbing}
+        .task.over{border-color:var(--gold);border-style:dashed}
+        .task-priority{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%}
+        .priority-alta{background:var(--red)}
+        .priority-media{background:var(--gold)}
+        .priority-baja{background:var(--green)}
+        .task-title{font-size:0.85em;color:#fff;margin-bottom:6px;padding-right:16px}
+        .task-desc{font-size:0.72em;color:#666;margin-bottom:8px;line-height:1.4}
+        .task-meta{display:flex;justify-content:space-between;align-items:center;font-size:0.65em;color:#555}
+        .task-assignee{color:var(--cyan)}
+        
+        /* Modal */
+        .modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);
+            backdrop-filter:blur(8px);z-index:1000;display:none;padding:20px;overflow-y:auto}
+        .modal-bg.show{display:flex;justify-content:center;align-items:center}
+        .modal{max-width:600px;width:100%;background:#0a0a1a;border:1px solid var(--border);
+            border-radius:16px;padding:30px;position:relative}
+        .modal-close{position:absolute;top:16px;right:20px;font-size:1.8em;color:#555;cursor:pointer;
+            background:none;border:none;transition:color .3s;line-height:1}
+        .modal-close:hover{color:var(--gold)}
+        .modal h2{color:var(--gold);font-family:'Orbitron',sans-serif;font-size:1.1em;margin-bottom:20px}
+        .form-group{margin-bottom:16px}
+        .form-group label{display:block;color:#999;font-size:0.75em;margin-bottom:6px;text-transform:uppercase}
+        .form-group input,.form-group textarea,.form-group select{width:100%;padding:10px;border-radius:6px;
+            border:1px solid rgba(255,255,255,0.1);background:#050510;color:#ddd;font-family:inherit;font-size:0.85em}
+        .form-group textarea{resize:vertical;min-height:80px}
+        .form-actions{display:flex;gap:10px;margin-top:24px}
+        .btn-delete{background:rgba(255,51,102,0.12);border-color:rgba(255,51,102,0.3);color:var(--red)}
+        .btn-delete:hover{background:rgba(255,51,102,0.2)}
+    </style>
+</head>
+<body>
+    <canvas id="stars"></canvas>
+    
+    <div class="wrap">
+        <!-- Nav -->
+        <div class="topnav">
+            <h1>📋 KANBAN BOARD</h1>
+            <div class="navlinks">
+                <a href="/">Hub</a>
+                <a href="/office.html">Oficina</a>
+                <a href="/trading.html">Trading</a>
+                <a href="/vision.html">Vision</a>
+                <a href="/kanban.html" class="active">Kanban</a>
+                <a href="/graphs.html">Grafos</a>
+                <a href="/vectors.html">Vectores</a>
+                <a href="/logout" style="color:var(--red)">Salir</a>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-primary" onclick="openNewTaskModal()">+ Nueva Tarea</button>
+            <button class="btn" onclick="loadTasks()">🔄 Recargar</button>
+        </div>
+        
+        <!-- Board -->
+        <div class="board">
+            <div class="column" data-status="pending">
+                <div class="column-header">
+                    <span>SIN EMPEZAR</span>
+                    <span class="column-count" id="count-pending">0</span>
+                </div>
+                <div class="tasks" id="tasks-pending"></div>
+            </div>
+            <div class="column" data-status="discovering">
+                <div class="column-header">
+                    <span>DESCUBRIENDO</span>
+                    <span class="column-count" id="count-discovering">0</span>
+                </div>
+                <div class="tasks" id="tasks-discovering"></div>
+            </div>
+            <div class="column" data-status="in_progress">
+                <div class="column-header">
+                    <span>EN PROGRESO</span>
+                    <span class="column-count" id="count-in_progress">0</span>
+                </div>
+                <div class="tasks" id="tasks-in_progress"></div>
+            </div>
+            <div class="column" data-status="almost_done">
+                <div class="column-header">
+                    <span>CASI ACABADO</span>
+                    <span class="column-count" id="count-almost_done">0</span>
+                </div>
+                <div class="tasks" id="tasks-almost_done"></div>
+            </div>
+            <div class="column" data-status="done">
+                <div class="column-header">
+                    <span>HECHO</span>
+                    <span class="column-count" id="count-done">0</span>
+                </div>
+                <div class="tasks" id="tasks-done"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Task Modal -->
+    <div class="modal-bg" id="taskModal" onclick="if(event.target===this)closeModal()">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <h2 id="modalTitle">Nueva Tarea</h2>
+            <form id="taskForm" onsubmit="saveTask(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea name="description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Asignado a</label>
+                    <input type="text" name="assignee" placeholder="nombre">
+                </div>
+                <div class="form-group">
+                    <label>Prioridad</label>
+                    <select name="priority">
+                        <option value="baja">Baja</option>
+                        <option value="media" selected>Media</option>
+                        <option value="alta">Alta</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select name="status">
+                        <option value="pending" selected>Sin Empezar</option>
+                        <option value="discovering">Descubriendo</option>
+                        <option value="in_progress">En Progreso</option>
+                        <option value="almost_done">Casi Acabado</option>
+                        <option value="done">Hecho</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha límite</label>
+                    <input type="date" name="due_date">
+                </div>
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea name="notes"></textarea>
+                </div>
+                <input type="hidden" name="id">
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+                    <button type="button" class="btn btn-delete" id="deleteBtn" style="display:none" onclick="deleteTask()">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+    let tasks = [];
+    let draggedTask = null;
+    
+    // Load tasks
+    async function loadTasks() {
+        try {
+            const res = await fetch('/api/tasks');
+            if (!res.ok) throw new Error('Failed to load');
+            tasks = await res.json();
+            renderBoard();
+        } catch (e) {
+            console.error('Load error:', e);
+            alert('Error cargando tareas: ' + e.message);
+        }
+    }
+    
+    // Render board
+    function renderBoard() {
+        const statuses = ['pending', 'discovering', 'in_progress', 'almost_done', 'done'];
+        statuses.forEach(status => {
+            const container = document.getElementById('tasks-' + status);
+            const count = document.getElementById('count-' + status);
+            const statusTasks = tasks.filter(t => t.status === status);
+            count.textContent = statusTasks.length;
+            container.innerHTML = '';
+            statusTasks.forEach(task => {
+                const el = createTaskElement(task);
+                container.appendChild(el);
+            });
+        });
+    }
+    
+    // Create task card
+    function createTaskElement(task) {
+        const div = document.createElement('div');
+        div.className = 'task';
+        div.draggable = true;
+        div.dataset.id = task.id;
+        div.innerHTML = `
+            <div class="task-priority priority-${task.priority || 'media'}"></div>
+            <div class="task-title">${escapeHtml(task.title)}</div>
+            <div class="task-desc">${escapeHtml(task.description || '')}</div>
+            <div class="task-meta">
+                <span class="task-assignee">${task.assignee ? '@' + escapeHtml(task.assignee) : ''}</span>
+                <span>${task.due_date ? new Date(task.due_date).toLocaleDateString() : ''}</span>
+            </div>
+        `;
+        
+        // Drag events
+        div.addEventListener('dragstart', (e) => {
+            draggedTask = task;
+            div.classList.add('dragging');
+        });
+        div.addEventListener('dragend', () => {
+            div.classList.remove('dragging');
+            draggedTask = null;
+        });
+        
+        // Click to edit
+        div.addEventListener('click', () => openEditTaskModal(task));
+        
+        return div;
+    }
+    
+    // Drop zones
+    document.querySelectorAll('.tasks').forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.classList.add('over');
+        });
+        zone.addEventListener('dragleave', () => {
+            zone.classList.remove('over');
+        });
+        zone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            zone.classList.remove('over');
+            if (!draggedTask) return;
+            
+            const newStatus = zone.parentElement.dataset.status;
+            if (draggedTask.status === newStatus) return;
+            
+            // Update task
+            try {
+                const res = await fetch(`/api/tasks/${draggedTask.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                if (!res.ok) throw new Error('Update failed');
+                draggedTask.status = newStatus;
+                renderBoard();
+            } catch (e) {
+                console.error('Drop error:', e);
+                alert('Error actualizando tarea');
+            }
+        });
+    });
+    
+    // Modals
+    function openNewTaskModal() {
+        document.getElementById('modalTitle').textContent = 'Nueva Tarea';
+        document.getElementById('taskForm').reset();
+        document.getElementById('deleteBtn').style.display = 'none';
+        document.getElementById('taskModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function openEditTaskModal(task) {
+        document.getElementById('modalTitle').textContent = 'Editar Tarea';
+        const form = document.getElementById('taskForm');
+        form.title.value = task.title;
+        form.description.value = task.description || '';
+        form.assignee.value = task.assignee || '';
+        form.priority.value = task.priority || 'media';
+        form.status.value = task.status;
+        form.due_date.value = task.due_date ? task.due_date.split('T')[0] : '';
+        form.notes.value = task.notes || '';
+        form.id.value = task.id;
+        document.getElementById('deleteBtn').style.display = 'block';
+        document.getElementById('taskModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeModal() {
+        document.getElementById('taskModal').classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    
+    // Save task
+    async function saveTask(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = {
+            title: form.title.value,
+            description: form.description.value,
+            assignee: form.assignee.value,
+            priority: form.priority.value,
+            status: form.status.value,
+            due_date: form.due_date.value || null,
+            notes: form.notes.value
+        };
+        
+        try {
+            const id = form.id.value;
+            let res;
+            if (id) {
+                // Update
+                res = await fetch(`/api/tasks/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } else {
+                // Create
+                res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            }
+            if (!res.ok) throw new Error('Save failed');
+            closeModal();
+            loadTasks();
+        } catch (e) {
+            console.error('Save error:', e);
+            alert('Error guardando tarea: ' + e.message);
+        }
+    }
+    
+    // Delete task
+    async function deleteTask() {
+        if (!confirm('¿Eliminar esta tarea?')) return;
+        const id = document.getElementById('taskForm').id.value;
+        if (!id) return;
+        
+        try {
+            const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            closeModal();
+            loadTasks();
+        } catch (e) {
+            console.error('Delete error:', e);
+            alert('Error eliminando tarea');
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Escape key
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    
+    // Init
+    loadTasks();
+    
+    // === STARFIELD ===
+    (function(){
+        const c=document.getElementById('stars'),ctx=c.getContext('2d');
+        let w,h,stars=[];
+        function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;
+            stars=[];for(let i=0;i<200;i++)stars.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005})}
+        function draw(){ctx.clearRect(0,0,w,h);
+            stars.forEach(s=>{s.a+=s.s;if(s.a>1)s.s=-Math.abs(s.s);if(s.a<0.1)s.s=Math.abs(s.s);
+                ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(245,158,11,${s.a*0.6})`;ctx.fill()});
+            requestAnimationFrame(draw)}
+        resize();draw();window.addEventListener('resize',resize);
+    })();
+    </script>
+</body>
+</html>

@@ -5,9 +5,21 @@ const helmet = require('helmet');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 const app = express();
 const PORT = 9443;
+
+// === REDIS CLIENT (FalkorDB) ===
+let Redis;
+let graphClient;
+try {
+    Redis = require('ioredis');
+    graphClient = new Redis(6379, '127.0.0.1');
+    console.log('✅ FalkorDB Redis client initialized');
+} catch (e) {
+    console.warn('⚠️  ioredis not found - graph features disabled. Run: npm install ioredis');
+}
 
 // === SECURITY ===
 app.use(helmet({
@@ -200,8 +212,172 @@ app.get('/api/strategies', requireAuth, (req, res) => {
     }
 });
 
+// === DATABASE PROXY ROUTES ===
+
+// Supabase (PostgREST) - Tasks API
+app.get('/api/tasks', requireAuth, (req, res) => {
+    const reqProxy = http.get('http://127.0.0.1:3001/tasks?order=updated_at.desc', (proxyRes) => {
+        res.set('Content-Type', 'application/json');
+        proxyRes.pipe(res);
+    });
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.setTimeout(5000, () => { reqProxy.destroy(); res.status(504).json({ error: 'timeout' }); });
+});
+
+app.post('/api/tasks', requireAuth, (req, res) => {
+    const data = JSON.stringify(req.body);
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: '/tasks',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': data.length,
+            'Prefer': 'return=representation'
+        }
+    };
+    const reqProxy = http.request(options, (proxyRes) => {
+        let body = '';
+        proxyRes.on('data', chunk => body += chunk);
+        proxyRes.on('end', () => {
+            res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+        });
+    });
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.write(data);
+    reqProxy.end();
+});
+
+app.patch('/api/tasks/:id', requireAuth, (req, res) => {
+    const data = JSON.stringify(req.body);
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: `/tasks?id=eq.${req.params.id}`,
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': data.length,
+            'Prefer': 'return=representation'
+        }
+    };
+    const reqProxy = http.request(options, (proxyRes) => {
+        let body = '';
+        proxyRes.on('data', chunk => body += chunk);
+        proxyRes.on('end', () => {
+            res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+        });
+    });
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.write(data);
+    reqProxy.end();
+});
+
+app.delete('/api/tasks/:id', requireAuth, (req, res) => {
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: `/tasks?id=eq.${req.params.id}`,
+        method: 'DELETE'
+    };
+    const reqProxy = http.request(options, (proxyRes) => {
+        res.status(proxyRes.statusCode).end();
+    });
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.end();
+});
+
+// FalkorDB (Redis) - Graph API
+app.post('/api/graph/query', requireAuth, async (req, res) => {
+    if (!graphClient) return res.status(503).json({ error: 'FalkorDB not available' });
+    try {
+        const { query } = req.body;
+        const result = await graphClient.call('GRAPH.QUERY', 'orgchart', query);
+        res.json({ result });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/graph/orgchart', requireAuth, async (req, res) => {
+    if (!graphClient) return res.status(503).json({ error: 'FalkorDB not available' });
+    try {
+        // Query all nodes and edges
+        const query = 'MATCH (n)-[r]->(m) RETURN n.name, n.type, type(r), m.name, m.type';
+        const result = await graphClient.call('GRAPH.QUERY', 'orgchart', query);
+        
+        // Parse result into nodes and edges
+        const nodes = new Map();
+        const edges = [];
+        
+        if (result && result[1]) {
+            result[1].forEach(row => {
+                const [fromName, fromType, relType, toName, toType] = row;
+                if (!nodes.has(fromName)) nodes.set(fromName, { id: fromName, name: fromName, type: fromType });
+                if (!nodes.has(toName)) nodes.set(toName, { id: toName, name: toName, type: toType });
+                edges.push({ source: fromName, target: toName, label: relType });
+            });
+        }
+        
+        res.json({ nodes: Array.from(nodes.values()), edges });
+    } catch (e) {
+        console.error('Orgchart error:', e);
+        // Return default orgchart if query fails
+        res.json({
+            nodes: [
+                { id: 'Jefe', name: 'Jefe', type: 'ceo' },
+                { id: 'IA', name: 'IA', type: 'dept' },
+                { id: 'Trading', name: 'Trading', type: 'dept' },
+                { id: 'Seguridad', name: 'Seguridad', type: 'dept' },
+                { id: 'Energía', name: 'Energía', type: 'dept' },
+                { id: 'Vision', name: 'Vision', type: 'dept' }
+            ],
+            edges: [
+                { source: 'Jefe', target: 'IA', label: 'MANAGES' },
+                { source: 'Jefe', target: 'Trading', label: 'MANAGES' },
+                { source: 'Jefe', target: 'Seguridad', label: 'MANAGES' },
+                { source: 'Jefe', target: 'Energía', label: 'MANAGES' },
+                { source: 'Jefe', target: 'Vision', label: 'MANAGES' }
+            ]
+        });
+    }
+});
+
+// Qdrant - Vector DB API
+function proxyQdrant(path, method = 'GET', data = null) {
+    return (req, res) => {
+        const options = {
+            hostname: '127.0.0.1',
+            port: 6333,
+            path: path.replace(':name', req.params.name),
+            method: method,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        
+        const reqProxy = http.request(options, (proxyRes) => {
+            let body = '';
+            proxyRes.on('data', chunk => body += chunk);
+            proxyRes.on('end', () => {
+                res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+            });
+        });
+        
+        reqProxy.on('error', () => res.status(503).json({ error: 'Qdrant offline' }));
+        reqProxy.setTimeout(5000, () => { reqProxy.destroy(); res.status(504).json({ error: 'timeout' }); });
+        
+        if (data || (method === 'POST' && req.body)) {
+            reqProxy.write(JSON.stringify(data || req.body));
+        }
+        reqProxy.end();
+    };
+}
+
+app.get('/api/vectors/collections', requireAuth, proxyQdrant('/collections'));
+app.get('/api/vectors/collection/:name', requireAuth, proxyQdrant('/collections/:name'));
+app.post('/api/vectors/collection/:name/points/scroll', requireAuth, proxyQdrant('/collections/:name/points/scroll', 'POST'));
+
 // === CAMERA PROXY ===
-const http = require('http');
 
 app.get('/api/cam/dgx/snapshot', requireAuth, (req, res) => {
     const camReq = http.get('http://127.0.0.1:8090/snapshot', (camRes) => {

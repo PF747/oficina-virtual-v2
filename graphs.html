@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafos — πφe Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--gold:#f59e0b;--bg:#050510;--panel:rgba(8,12,30,0.85);--border:rgba(245,158,11,0.2);
+            --cyan:#00f0ff;--purple:#b829ff;--green:#00ff88;--red:#ff3366}
+        body{min-height:100vh;background:var(--bg);font-family:'JetBrains Mono',monospace;color:#c8d6e5;overflow:hidden}
+        canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+        .wrap{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;padding:20px}
+        
+        /* Top nav */
+        .topnav{display:flex;justify-content:space-between;align-items:center;padding:16px 0;margin-bottom:20px;
+            border-bottom:1px solid var(--border)}
+        .topnav h1{font-family:'Orbitron',sans-serif;font-size:1.4em;color:var(--gold);letter-spacing:2px}
+        .navlinks{display:flex;gap:12px;align-items:center}
+        .navlinks a{padding:6px 14px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);
+            background:rgba(255,255,255,0.02);color:#888;text-decoration:none;font-size:0.75em;transition:all .3s}
+        .navlinks a:hover{border-color:var(--gold);color:var(--gold)}
+        .navlinks a.active{border-color:var(--gold);color:var(--gold);background:rgba(245,158,11,0.1)}
+        
+        /* Controls */
+        .controls{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+        .btn{padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:var(--panel);
+            color:var(--gold);font-family:inherit;font-size:0.85em;cursor:pointer;transition:all .3s}
+        .btn:hover{background:rgba(245,158,11,0.15);border-color:var(--gold)}
+        .badge{padding:4px 10px;border-radius:6px;font-size:0.7em;background:rgba(0,255,136,0.15);
+            color:var(--green);border:1px solid rgba(0,255,136,0.3)}
+        
+        /* Graph canvas */
+        .graph-container{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+            position:relative;overflow:hidden}
+        #graphCanvas{width:100%;height:100%;display:block}
+        .graph-legend{position:absolute;top:16px;right:16px;background:rgba(0,0,0,0.7);backdrop-filter:blur(10px);
+            border:1px solid var(--border);border-radius:8px;padding:12px;font-size:0.7em}
+        .legend-item{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+        .legend-dot{width:12px;height:12px;border-radius:50%}
+        .type-ceo{background:var(--gold)}
+        .type-dept{background:var(--cyan)}
+        .type-person{background:var(--green)}
+        
+        /* Modal */
+        .modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);
+            backdrop-filter:blur(8px);z-index:1000;display:none;justify-content:center;align-items:center}
+        .modal-bg.show{display:flex}
+        .modal{max-width:500px;width:90%;background:#0a0a1a;border:1px solid var(--border);
+            border-radius:16px;padding:30px;position:relative}
+        .modal-close{position:absolute;top:16px;right:20px;font-size:1.8em;color:#555;cursor:pointer;
+            background:none;border:none;transition:color .3s;line-height:1}
+        .modal-close:hover{color:var(--gold)}
+        .modal h2{color:var(--gold);font-family:'Orbitron',sans-serif;font-size:1.1em;margin-bottom:20px}
+        .form-group{margin-bottom:16px}
+        .form-group label{display:block;color:#999;font-size:0.75em;margin-bottom:6px;text-transform:uppercase}
+        .form-group input,.form-group select{width:100%;padding:10px;border-radius:6px;
+            border:1px solid rgba(255,255,255,0.1);background:#050510;color:#ddd;font-family:inherit;font-size:0.85em}
+        .form-actions{display:flex;gap:10px;margin-top:24px}
+    </style>
+</head>
+<body>
+    <canvas id="stars"></canvas>
+    
+    <div class="wrap">
+        <!-- Nav -->
+        <div class="topnav">
+            <h1>🕸️ FALKORDB GRAPH EXPLORER</h1>
+            <div class="navlinks">
+                <a href="/">Hub</a>
+                <a href="/office.html">Oficina</a>
+                <a href="/trading.html">Trading</a>
+                <a href="/vision.html">Vision</a>
+                <a href="/kanban.html">Kanban</a>
+                <a href="/graphs.html" class="active">Grafos</a>
+                <a href="/vectors.html">Vectores</a>
+                <a href="/logout" style="color:var(--red)">Salir</a>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <button class="btn" onclick="loadOrgChart()">🔄 Cargar Orgchart</button>
+            <button class="btn" onclick="openAddNodeModal()">+ Añadir Nodo</button>
+            <button class="btn" onclick="openAddEdgeModal()">+ Añadir Relación</button>
+            <span class="badge">🚀 NVIDIA Optimized</span>
+        </div>
+        
+        <!-- Graph -->
+        <div class="graph-container">
+            <canvas id="graphCanvas"></canvas>
+            <div class="graph-legend">
+                <div class="legend-item">
+                    <div class="legend-dot type-ceo"></div>
+                    <span>CEO / Jefe</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot type-dept"></div>
+                    <span>Departamento</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot type-person"></div>
+                    <span>Persona</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Node Modal -->
+    <div class="modal-bg" id="nodeModal" onclick="if(event.target===this)closeModals()">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModals()">×</button>
+            <h2>Añadir Nodo</h2>
+            <form id="nodeForm" onsubmit="addNode(event)">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select name="type">
+                        <option value="person">Persona</option>
+                        <option value="dept">Departamento</option>
+                        <option value="ceo">CEO</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Crear</button>
+                    <button type="button" class="btn" onclick="closeModals()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Add Edge Modal -->
+    <div class="modal-bg" id="edgeModal" onclick="if(event.target===this)closeModals()">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModals()">×</button>
+            <h2>Añadir Relación</h2>
+            <form id="edgeForm" onsubmit="addEdge(event)">
+                <div class="form-group">
+                    <label>Desde (nombre)</label>
+                    <input type="text" name="from" required>
+                </div>
+                <div class="form-group">
+                    <label>Hasta (nombre)</label>
+                    <input type="text" name="to" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de relación</label>
+                    <select name="rel">
+                        <option value="MANAGES">MANAGES</option>
+                        <option value="WORKS_IN">WORKS_IN</option>
+                        <option value="REPORTS_TO">REPORTS_TO</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Crear</button>
+                    <button type="button" class="btn" onclick="closeModals()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+    // Graph data
+    let nodes = [];
+    let edges = [];
+    let simulation = null;
+    
+    // Canvas
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    
+    function resizeCanvas() {
+        const container = canvas.parentElement;
+        width = canvas.width = container.clientWidth;
+        height = canvas.height = container.clientHeight;
+    }
+    
+    // Load orgchart from API
+    async function loadOrgChart() {
+        try {
+            const res = await fetch('/api/graph/orgchart');
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            nodes = data.nodes;
+            edges = data.edges;
+            initSimulation();
+        } catch (e) {
+            console.error('Load error:', e);
+            alert('Error cargando orgchart: ' + e.message);
+        }
+    }
+    
+    // Initialize D3 force simulation
+    function initSimulation() {
+        if (simulation) simulation.stop();
+        
+        simulation = d3.forceSimulation(nodes)
+            .force('charge', d3.forceManyBody().strength(-300))
+            .force('link', d3.forceLink(edges).id(d => d.id).distance(150))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(40))
+            .on('tick', draw);
+        
+        // Drag behavior
+        canvas.addEventListener('mousedown', dragStart);
+        canvas.addEventListener('mousemove', drag);
+        canvas.addEventListener('mouseup', dragEnd);
+    }
+    
+    let dragNode = null;
+    
+    function dragStart(event) {
+        const [mx, my] = [event.offsetX, event.offsetY];
+        dragNode = nodes.find(n => {
+            const dx = n.x - mx, dy = n.y - my;
+            return Math.sqrt(dx*dx + dy*dy) < 30;
+        });
+        if (dragNode) {
+            dragNode.fx = dragNode.x;
+            dragNode.fy = dragNode.y;
+        }
+    }
+    
+    function drag(event) {
+        if (!dragNode) return;
+        dragNode.fx = event.offsetX;
+        dragNode.fy = event.offsetY;
+        simulation.alpha(0.3).restart();
+    }
+    
+    function dragEnd() {
+        if (dragNode) {
+            dragNode.fx = null;
+            dragNode.fy = null;
+        }
+        dragNode = null;
+    }
+    
+    // Draw graph
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        
+        // Draw edges
+        ctx.strokeStyle = 'rgba(245,158,11,0.3)';
+        ctx.lineWidth = 2;
+        edges.forEach(e => {
+            ctx.beginPath();
+            ctx.moveTo(e.source.x, e.source.y);
+            ctx.lineTo(e.target.x, e.target.y);
+            ctx.stroke();
+            
+            // Label
+            const mx = (e.source.x + e.target.x) / 2;
+            const my = (e.source.y + e.target.y) / 2;
+            ctx.fillStyle = 'rgba(245,158,11,0.6)';
+            ctx.font = '10px JetBrains Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText(e.label, mx, my);
+        });
+        
+        // Draw nodes
+        nodes.forEach(n => {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, 30, 0, Math.PI * 2);
+            ctx.fillStyle = getNodeColor(n.type);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Label
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px JetBrains Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText(n.name, n.x, n.y + 45);
+        });
+    }
+    
+    function getNodeColor(type) {
+        if (type === 'ceo') return '#f59e0b';
+        if (type === 'dept') return '#00f0ff';
+        return '#00ff88';
+    }
+    
+    // Add node
+    async function addNode(e) {
+        e.preventDefault();
+        const form = e.target;
+        const name = form.name.value;
+        const type = form.type.value;
+        
+        try {
+            const query = `CREATE (n:Node {name:'${name}', type:'${type}'})`;
+            const res = await fetch('/api/graph/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            if (!res.ok) throw new Error('Query failed');
+            
+            // Add to local graph
+            nodes.push({ id: name, name, type, x: width/2, y: height/2 });
+            initSimulation();
+            closeModals();
+        } catch (err) {
+            console.error('Add node error:', err);
+            alert('Error añadiendo nodo');
+        }
+    }
+    
+    // Add edge
+    async function addEdge(e) {
+        e.preventDefault();
+        const form = e.target;
+        const from = form.from.value;
+        const to = form.to.value;
+        const rel = form.rel.value;
+        
+        try {
+            const query = `MATCH (a:Node {name:'${from}'}), (b:Node {name:'${to}'}) CREATE (a)-[:${rel}]->(b)`;
+            const res = await fetch('/api/graph/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            if (!res.ok) throw new Error('Query failed');
+            
+            // Add to local graph
+            const source = nodes.find(n => n.name === from);
+            const target = nodes.find(n => n.name === to);
+            if (source && target) {
+                edges.push({ source: source.id, target: target.id, label: rel });
+                initSimulation();
+            }
+            closeModals();
+        } catch (err) {
+            console.error('Add edge error:', err);
+            alert('Error añadiendo relación');
+        }
+    }
+    
+    // Modals
+    function openAddNodeModal() {
+        document.getElementById('nodeModal').classList.add('show');
+    }
+    
+    function openAddEdgeModal() {
+        document.getElementById('edgeModal').classList.add('show');
+    }
+    
+    function closeModals() {
+        document.getElementById('nodeModal').classList.remove('show');
+        document.getElementById('edgeModal').classList.remove('show');
+    }
+    
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
+    
+    // Init
+    resizeCanvas();
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+        if (simulation) simulation.force('center', d3.forceCenter(width / 2, height / 2)).restart();
+    });
+    loadOrgChart();
+    
+    // === STARFIELD ===
+    (function(){
+        const c=document.getElementById('stars'),ctx=c.getContext('2d');
+        let w,h,stars=[];
+        function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;
+            stars=[];for(let i=0;i<200;i++)stars.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005})}
+        function draw(){ctx.clearRect(0,0,w,h);
+            stars.forEach(s=>{s.a+=s.s;if(s.a>1)s.s=-Math.abs(s.s);if(s.a<0.1)s.s=Math.abs(s.s);
+                ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(245,158,11,${s.a*0.6})`;ctx.fill()});
+            requestAnimationFrame(draw)}
+        resize();draw();window.addEventListener('resize',resize);
+    })();
+    </script>
+</body>
+</html>

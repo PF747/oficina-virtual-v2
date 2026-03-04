@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vectores — πφe Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--gold:#f59e0b;--bg:#050510;--panel:rgba(8,12,30,0.85);--border:rgba(245,158,11,0.2);
+            --cyan:#00f0ff;--purple:#b829ff;--green:#00ff88;--red:#ff3366}
+        body{min-height:100vh;background:var(--bg);font-family:'JetBrains Mono',monospace;color:#c8d6e5;overflow-x:hidden}
+        canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+        .wrap{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:20px}
+        
+        /* Top nav */
+        .topnav{display:flex;justify-content:space-between;align-items:center;padding:16px 0;margin-bottom:20px;
+            border-bottom:1px solid var(--border)}
+        .topnav h1{font-family:'Orbitron',sans-serif;font-size:1.4em;color:var(--gold);letter-spacing:2px}
+        .navlinks{display:flex;gap:12px;align-items:center}
+        .navlinks a{padding:6px 14px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);
+            background:rgba(255,255,255,0.02);color:#888;text-decoration:none;font-size:0.75em;transition:all .3s}
+        .navlinks a:hover{border-color:var(--gold);color:var(--gold)}
+        .navlinks a.active{border-color:var(--gold);color:var(--gold);background:rgba(245,158,11,0.1)}
+        
+        /* Controls */
+        .controls{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
+        .btn{padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:var(--panel);
+            color:var(--gold);font-family:inherit;font-size:0.85em;cursor:pointer;transition:all .3s}
+        .btn:hover{background:rgba(245,158,11,0.15);border-color:var(--gold)}
+        .search-box{flex:1;max-width:400px;padding:10px 16px;border-radius:8px;border:1px solid var(--border);
+            background:var(--panel);color:#ddd;font-family:inherit;font-size:0.85em}
+        .badge{padding:4px 10px;border-radius:6px;font-size:0.7em;background:rgba(184,41,255,0.15);
+            color:var(--purple);border:1px solid rgba(184,41,255,0.3)}
+        
+        /* Layout */
+        .main{display:grid;grid-template-columns:300px 1fr;gap:20px}
+        
+        /* Collections sidebar */
+        .collections{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;
+            max-height:70vh;overflow-y:auto}
+        .collections h3{font-family:'Orbitron',sans-serif;font-size:0.9em;color:var(--gold);margin-bottom:12px}
+        .collection-item{padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);
+            background:rgba(255,255,255,0.02);margin-bottom:8px;cursor:pointer;transition:all .3s}
+        .collection-item:hover{border-color:var(--border);background:rgba(245,158,11,0.05)}
+        .collection-item.active{border-color:var(--gold);background:rgba(245,158,11,0.1)}
+        .collection-name{color:#ddd;font-size:0.85em;margin-bottom:4px}
+        .collection-meta{color:#666;font-size:0.7em}
+        .collections::-webkit-scrollbar{width:4px}
+        .collections::-webkit-scrollbar-thumb{background:rgba(245,158,11,0.2);border-radius:2px}
+        
+        /* Content area */
+        .content{display:flex;flex-direction:column;gap:20px}
+        
+        /* Stats panel */
+        .stats{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;
+            display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+        .stat-box{text-align:center}
+        .stat-value{font-family:'Orbitron',sans-serif;font-size:1.8em;color:var(--gold);margin-bottom:4px}
+        .stat-label{color:#666;font-size:0.7em;text-transform:uppercase}
+        
+        /* Visualization */
+        .viz{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;
+            min-height:400px;position:relative}
+        .viz h3{font-family:'Orbitron',sans-serif;font-size:0.9em;color:var(--gold);margin-bottom:12px}
+        #vizCanvas{width:100%;height:400px;border-radius:8px;background:#0a0a1a}
+        .viz-note{color:#666;font-size:0.72em;margin-top:10px;font-style:italic}
+        
+        /* Points list */
+        .points{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;
+            max-height:400px;overflow-y:auto}
+        .points h3{font-family:'Orbitron',sans-serif;font-size:0.9em;color:var(--gold);margin-bottom:12px}
+        .point-item{padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);
+            background:rgba(255,255,255,0.02);margin-bottom:8px;font-size:0.75em}
+        .point-id{color:var(--cyan);margin-bottom:4px}
+        .point-payload{color:#888;line-height:1.4}
+        .points::-webkit-scrollbar{width:4px}
+        .points::-webkit-scrollbar-thumb{background:rgba(245,158,11,0.2);border-radius:2px}
+    </style>
+</head>
+<body>
+    <canvas id="stars"></canvas>
+    
+    <div class="wrap">
+        <!-- Nav -->
+        <div class="topnav">
+            <h1>🧬 QDRANT VECTOR DB</h1>
+            <div class="navlinks">
+                <a href="/">Hub</a>
+                <a href="/office.html">Oficina</a>
+                <a href="/trading.html">Trading</a>
+                <a href="/vision.html">Vision</a>
+                <a href="/kanban.html">Kanban</a>
+                <a href="/graphs.html">Grafos</a>
+                <a href="/vectors.html" class="active">Vectores</a>
+                <a href="/logout" style="color:var(--red)">Salir</a>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <button class="btn" onclick="loadCollections()">🔄 Recargar</button>
+            <input type="text" class="search-box" placeholder="Buscar vectores... (próximamente)" disabled>
+            <span class="badge">QDRANT</span>
+        </div>
+        
+        <!-- Main layout -->
+        <div class="main">
+            <!-- Collections sidebar -->
+            <div class="collections">
+                <h3>Colecciones</h3>
+                <div id="collectionsList">
+                    <p style="color:#666;font-size:0.75em">Cargando...</p>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div class="content">
+                <!-- Stats -->
+                <div class="stats" id="stats" style="display:none">
+                    <div class="stat-box">
+                        <div class="stat-value" id="statVectors">-</div>
+                        <div class="stat-label">Vectores</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statDimension">-</div>
+                        <div class="stat-label">Dimensión</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statDistance">-</div>
+                        <div class="stat-label">Distancia</div>
+                    </div>
+                </div>
+                
+                <!-- Visualization -->
+                <div class="viz" id="vizSection" style="display:none">
+                    <h3>Visualización 2D (proyección aleatoria)</h3>
+                    <canvas id="vizCanvas"></canvas>
+                    <div class="viz-note">
+                        Proyección simple de vectores de alta dimensión. Para análisis preciso usar PCA/t-SNE.
+                    </div>
+                </div>
+                
+                <!-- Points list -->
+                <div class="points" id="pointsSection" style="display:none">
+                    <h3>Puntos</h3>
+                    <div id="pointsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    let collections = [];
+    let currentCollection = null;
+    
+    // Load collections
+    async function loadCollections() {
+        try {
+            const res = await fetch('/api/vectors/collections');
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            collections = data.result?.collections || [];
+            renderCollections();
+        } catch (e) {
+            console.error('Load error:', e);
+            document.getElementById('collectionsList').innerHTML = 
+                '<p style="color:var(--red);font-size:0.75em">Error: ' + e.message + '</p>';
+        }
+    }
+    
+    // Render collections
+    function renderCollections() {
+        const list = document.getElementById('collectionsList');
+        if (collections.length === 0) {
+            list.innerHTML = '<p style="color:#666;font-size:0.75em">No hay colecciones</p>';
+            return;
+        }
+        
+        list.innerHTML = '';
+        collections.forEach(col => {
+            const el = document.createElement('div');
+            el.className = 'collection-item';
+            el.innerHTML = `
+                <div class="collection-name">${col.name}</div>
+                <div class="collection-meta">${col.points_count || 0} puntos</div>
+            `;
+            el.onclick = () => selectCollection(col.name);
+            list.appendChild(el);
+        });
+    }
+    
+    // Select collection
+    async function selectCollection(name) {
+        currentCollection = name;
+        
+        // Update active state
+        document.querySelectorAll('.collection-item').forEach(el => el.classList.remove('active'));
+        event.target.closest('.collection-item').classList.add('active');
+        
+        // Load collection info
+        try {
+            const res = await fetch(`/api/vectors/collection/${name}`);
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            
+            // Show stats
+            document.getElementById('stats').style.display = 'grid';
+            document.getElementById('statVectors').textContent = data.result?.points_count || 0;
+            document.getElementById('statDimension').textContent = data.result?.config?.params?.vectors?.size || '-';
+            document.getElementById('statDistance').textContent = data.result?.config?.params?.vectors?.distance || '-';
+            
+            // Load points
+            loadPoints(name);
+        } catch (e) {
+            console.error('Collection error:', e);
+            alert('Error cargando colección');
+        }
+    }
+    
+    // Load points
+    async function loadPoints(collection) {
+        try {
+            const res = await fetch(`/api/vectors/collection/${collection}/points/scroll`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ limit: 20, with_vector: true, with_payload: true })
+            });
+            if (!res.ok) throw new Error('Failed to load points');
+            const data = await res.json();
+            const points = data.result?.points || [];
+            
+            renderPoints(points);
+            visualizePoints(points);
+        } catch (e) {
+            console.error('Points error:', e);
+            alert('Error cargando puntos');
+        }
+    }
+    
+    // Render points
+    function renderPoints(points) {
+        const container = document.getElementById('pointsList');
+        const section = document.getElementById('pointsSection');
+        section.style.display = 'block';
+        
+        if (points.length === 0) {
+            container.innerHTML = '<p style="color:#666;font-size:0.75em">No hay puntos</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        points.forEach(point => {
+            const el = document.createElement('div');
+            el.className = 'point-item';
+            const payloadStr = JSON.stringify(point.payload || {}, null, 2)
+                .substring(0, 200) + (JSON.stringify(point.payload).length > 200 ? '...' : '');
+            el.innerHTML = `
+                <div class="point-id">ID: ${point.id}</div>
+                <div class="point-payload"><pre>${payloadStr}</pre></div>
+            `;
+            container.appendChild(el);
+        });
+    }
+    
+    // Visualize points (simple 2D projection)
+    function visualizePoints(points) {
+        const section = document.getElementById('vizSection');
+        const canvas = document.getElementById('vizCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        section.style.display = 'block';
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        
+        if (points.length === 0) return;
+        
+        // Simple random projection to 2D
+        const projected = points.map(p => {
+            const vec = p.vector;
+            if (!vec || vec.length < 2) return { x: Math.random(), y: Math.random() };
+            
+            // Use first two dimensions or random projection
+            const x = vec[0] || Math.random();
+            const y = vec[1] || Math.random();
+            return { x, y };
+        });
+        
+        // Normalize to canvas
+        const xs = projected.map(p => p.x);
+        const ys = projected.map(p => p.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const rangeX = maxX - minX || 1;
+        const rangeY = maxY - minY || 1;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw points
+        projected.forEach(p => {
+            const x = ((p.x - minX) / rangeX) * (canvas.width - 80) + 40;
+            const y = ((p.y - minY) / rangeY) * (canvas.height - 80) + 40;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(245,158,11,0.7)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(245,158,11,0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+        
+        // Draw axes
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(40, canvas.height / 2);
+        ctx.lineTo(canvas.width - 40, canvas.height / 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, 40);
+        ctx.lineTo(canvas.width / 2, canvas.height - 40);
+        ctx.stroke();
+        
+        // Labels
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '10px JetBrains Mono';
+        ctx.fillText('Dim 1', canvas.width - 35, canvas.height / 2 - 5);
+        ctx.fillText('Dim 2', canvas.width / 2 + 5, 35);
+    }
+    
+    // Init
+    loadCollections();
+    
+    // === STARFIELD ===
+    (function(){
+        const c=document.getElementById('stars'),ctx=c.getContext('2d');
+        let w,h,stars=[];
+        function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;
+            stars=[];for(let i=0;i<200;i++)stars.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005})}
+        function draw(){ctx.clearRect(0,0,w,h);
+            stars.forEach(s=>{s.a+=s.s;if(s.a>1)s.s=-Math.abs(s.s);if(s.a<0.1)s.s=Math.abs(s.s);
+                ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(245,158,11,${s.a*0.6})`;ctx.fill()});
+            requestAnimationFrame(draw)}
+        resize();draw();window.addEventListener('resize',resize);
+    })();
+    </script>
+</body>
+</html>
