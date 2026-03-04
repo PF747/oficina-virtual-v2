@@ -221,6 +221,25 @@ app.get('/api/cam/dgx/snapshot', requireAuth, (req, res) => {
     });
 });
 
+// Jetson camera proxy (port 8765 on Jetson)
+app.get('/api/cam/jetson/snapshot', requireAuth, (req, res) => {
+    const camReq = http.get('http://192.168.1.137:8765/snap', (camRes) => {
+        res.set({
+            'Content-Type': 'image/jpeg',
+            'Cache-Control': 'no-cache, no-store',
+            'Access-Control-Allow-Origin': '*'
+        });
+        camRes.pipe(res);
+    });
+    camReq.on('error', () => {
+        res.status(503).json({ error: 'Jetson camera offline' });
+    });
+    camReq.setTimeout(3000, () => {
+        camReq.destroy();
+        res.status(504).json({ error: 'Jetson camera timeout' });
+    });
+});
+
 // Protected static files — index.html is the main hub
 app.use('/', requireAuth, express.static(__dirname, {
     index: 'index.html',

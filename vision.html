@@ -94,8 +94,8 @@
         <div class="stats">
             <div class="stat">
                 <div class="label">CÁMARAS ONLINE</div>
-                <div class="value" id="camOnline">1 / 2</div>
-                <div class="sub">DGX activa · Jetson pendiente</div>
+                <div class="value" id="camOnline">2 / 2</div>
+                <div class="sub">DGX activa · Jetson activa</div>
             </div>
             <div class="stat">
                 <div class="label">RESOLUCIÓN</div>
@@ -136,23 +136,17 @@
             <!-- Jetson Camera -->
             <div class="cam-card">
                 <div class="cam-header">
-                    <h3>📷 JETSON — Laboratorio</h3>
-                    <span class="live" style="color:var(--red)">
-                        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>
-                        OFFLINE
-                    </span>
+                    <h3>📷 JETSON ORIN — Oficina (ángulo 2)</h3>
+                    <span class="live" id="jetsonLive">LIVE</span>
                 </div>
                 <div class="cam-view">
-                    <div class="offline-msg">
-                        <span>📡</span>
-                        Jetson (192.168.1.137) — Sin acceso SSH<br><br>
-                        <span style="font-size:0.8em;color:#555">Se necesita configurar acceso para activar la cámara</span>
-                    </div>
+                    <img id="jetsonCam" src="/api/cam/jetson/snapshot" alt="Jetson Camera">
+                    <div class="overlay" id="jetsonTs">—</div>
                 </div>
                 <div class="cam-controls">
-                    <button disabled style="opacity:0.3">⟳ Auto</button>
-                    <button disabled style="opacity:0.3">📸 Captura</button>
-                    <button disabled style="opacity:0.3">⛶ Full</button>
+                    <button onclick="toggleJetson()" class="active" id="jetsonAutoBtn">⟳ Auto (2s)</button>
+                    <button onclick="captureCam('jetson')">📸 Captura</button>
+                    <button onclick="toggleFullscreen('jetsonCam')">⛶ Full</button>
                 </div>
             </div>
         </div>
@@ -174,7 +168,7 @@
                 <div class="log-entry">
                     <span class="log-time">18:33</span>
                     <span class="log-cam">JETSON</span>
-                    <span class="log-event alert">⚠️ Sin conexión — SSH denegado (192.168.1.137)</span>
+                    <span class="log-event">📷 Cámara inicializada — Sunplus SPCA2281 (elecnor-safety-brain)</span>
                 </div>
             </div>
         </div>
@@ -206,6 +200,27 @@
     setInterval(refreshDGX, 2500);
     refreshDGX();
 
+    // Jetson auto-refresh
+    let jetsonAutoRefresh = true;
+    function refreshJetson() {
+        if (!jetsonAutoRefresh) return;
+        const img = document.getElementById('jetsonCam');
+        const newImg = new Image();
+        newImg.onload = () => {
+            img.src = newImg.src;
+            const now = new Date();
+            document.getElementById('jetsonTs').textContent = 
+                now.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        };
+        newImg.onerror = () => {
+            document.getElementById('jetsonLive').textContent = 'OFFLINE';
+            document.getElementById('jetsonLive').style.color = 'var(--red)';
+        };
+        newImg.src = '/api/cam/jetson/snapshot?t=' + Date.now();
+    }
+    setInterval(refreshJetson, 2500);
+    refreshJetson();
+
     function refreshCam(cam) {
         if (cam === 'dgx') {
             dgxAutoRefresh = !dgxAutoRefresh;
@@ -215,15 +230,21 @@
         }
     }
 
+    function toggleJetson() {
+        jetsonAutoRefresh = !jetsonAutoRefresh;
+        const btn = document.getElementById('jetsonAutoBtn');
+        btn.textContent = jetsonAutoRefresh ? '⟳ Auto (2s)' : '⟳ Pausado';
+        btn.classList.toggle('active', jetsonAutoRefresh);
+    }
+
     function captureCam(cam) {
-        if (cam === 'dgx') {
-            const img = document.getElementById('dgxCam');
-            const a = document.createElement('a');
-            a.href = img.src;
-            a.download = `dgx-capture-${Date.now()}.jpg`;
-            a.click();
-            addLog('DGX', '📸 Captura guardada');
-        }
+        const imgId = cam === 'dgx' ? 'dgxCam' : 'jetsonCam';
+        const img = document.getElementById(imgId);
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = `${cam}-capture-${Date.now()}.jpg`;
+        a.click();
+        addLog(cam.toUpperCase(), '📸 Captura guardada');
     }
 
     function toggleFullscreen(id) {
