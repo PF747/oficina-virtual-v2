@@ -20,9 +20,12 @@ app.use(helmet({
             imgSrc: ["'self'", "data:", "blob:"],
             connectSrc: ["'self'"],
             workerSrc: ["'self'", "blob:"],
+            frameSrc: ["'self'"],
+            frameAncestors: ["'self'"],
+            upgradeInsecureRequests: null,  // Disable — we serve HTTP internally
         }
     },
-    hsts: { maxAge: 31536000, includeSubDomains: true }
+    hsts: false  // No HSTS on internal HTTP
 }));
 
 app.use(express.json());

@@ -165,7 +165,18 @@
 
     <!-- IFRAME FOR OFFICE & TRADING -->
     <div id="app-frame">
-        <iframe id="main-iframe" src="/office.html"></iframe>
+        <iframe id="main-iframe" src="/office.html" allow="accelerometer; autoplay; encrypted-media; gyroscope" style="width:100%;height:100%;border:none;"></iframe>
+    </div>
+
+    <!-- FALLBACK if iframe doesn't show -->
+    <div id="fallback" style="display:none; position:fixed; top:52px; left:0; right:0; bottom:0; background:#050510; z-index:5; padding:40px; text-align:center;">
+        <h2 style="color:#f59e0b; font-family:'Orbitron',sans-serif; margin-bottom:20px;">🦁 πφe COMMAND CENTER</h2>
+        <p style="color:#888; margin-bottom:30px;">Si no ves la oficina 3D, accede directamente:</p>
+        <div style="display:flex; flex-direction:column; gap:16px; max-width:400px; margin:0 auto;">
+            <a href="/office.html" style="display:block; padding:16px 24px; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; border-radius:12px; color:#f59e0b; text-decoration:none; font-family:'JetBrains Mono',monospace;">🏢 Oficina 3D</a>
+            <a href="/trading.html" style="display:block; padding:16px 24px; background:rgba(0,240,255,0.1); border:1px solid #00f0ff; border-radius:12px; color:#00f0ff; text-decoration:none; font-family:'JetBrains Mono',monospace;">📈 Trading Dashboard</a>
+            <button onclick="navigate('strategies')" style="display:block; padding:16px 24px; background:rgba(184,41,255,0.1); border:1px solid #b829ff; border-radius:12px; color:#b829ff; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:1em;">🧠 Trading Strategies</button>
+        </div>
     </div>
 
     <!-- STRATEGIES VIEW (inline, not iframe) -->
@@ -330,6 +341,19 @@
         fetch('/api/status').then(r=>r.json()).then(d => {
             if(d.user) document.getElementById('userBadge').textContent = `👤 ${d.user.username}`;
         }).catch(()=>{});
+
+        // === IFRAME FALLBACK ===
+        // If iframe fails to load after 5s, show direct links
+        setTimeout(() => {
+            const iframe = document.getElementById('main-iframe');
+            try {
+                // Check if iframe loaded something
+                if (!iframe.contentWindow || !iframe.contentDocument) throw 'blocked';
+            } catch(e) {
+                document.getElementById('fallback').style.display = 'block';
+                document.getElementById('app-frame').style.display = 'none';
+            }
+        }, 5000);
     </script>
 </body>
 </html>
