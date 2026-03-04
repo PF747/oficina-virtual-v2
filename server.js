@@ -200,6 +200,27 @@ app.get('/api/strategies', requireAuth, (req, res) => {
     }
 });
 
+// === CAMERA PROXY ===
+const http = require('http');
+
+app.get('/api/cam/dgx/snapshot', requireAuth, (req, res) => {
+    const camReq = http.get('http://127.0.0.1:8090/snapshot', (camRes) => {
+        res.set({
+            'Content-Type': 'image/jpeg',
+            'Cache-Control': 'no-cache, no-store',
+            'Access-Control-Allow-Origin': '*'
+        });
+        camRes.pipe(res);
+    });
+    camReq.on('error', () => {
+        res.status(503).json({ error: 'Camera offline' });
+    });
+    camReq.setTimeout(3000, () => {
+        camReq.destroy();
+        res.status(504).json({ error: 'Camera timeout' });
+    });
+});
+
 // Protected static files — index.html is the main hub
 app.use('/', requireAuth, express.static(__dirname, {
     index: 'index.html',

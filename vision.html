@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>πφe — AI Vision Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--gold:#f59e0b;--bg:#050510;--panel:rgba(8,12,30,0.9);--border:rgba(245,158,11,0.15);
+            --cyan:#00f0ff;--green:#00ff88;--red:#ff3366;--purple:#b829ff}
+        body{background:var(--bg);color:#c8d6e5;font-family:'JetBrains Mono',monospace;min-height:100vh}
+        
+        /* Nav */
+        .nav{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(5,5,16,0.95);
+            border-bottom:1px solid var(--border);z-index:100;display:flex;align-items:center;
+            padding:0 16px;gap:12px;backdrop-filter:blur(10px)}
+        .nav a{padding:5px 12px;border-radius:6px;font-size:0.72em;text-decoration:none;transition:all .2s;
+            border:1px solid transparent}
+        .nav a.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,240,255,0.08)}
+        .nav a:not(.active){color:#666}
+        .nav a:not(.active):hover{color:#aaa;border-color:rgba(255,255,255,0.1)}
+        .nav .title{font-family:'Orbitron',sans-serif;color:var(--cyan);font-size:0.85em;font-weight:700;margin-right:auto}
+        .nav .status{font-size:0.65em;color:var(--green)}
+
+        /* Main */
+        .main{padding:60px 16px 16px;max-width:1400px;margin:0 auto}
+        
+        /* Camera Grid */
+        .cam-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(500px,1fr));gap:16px;margin-bottom:20px}
+        .cam-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+        .cam-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+            border-bottom:1px solid var(--border)}
+        .cam-header h3{font-family:'Orbitron',sans-serif;font-size:0.8em;color:var(--cyan)}
+        .cam-header .live{display:flex;align-items:center;gap:6px;font-size:0.7em;color:var(--green)}
+        .cam-header .live::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--green);
+            animation:pulse 1.5s infinite}
+        .cam-header .offline .live{color:var(--red)}
+        .cam-header .offline .live::before{background:var(--red);animation:none}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+        
+        .cam-view{position:relative;background:#000;min-height:300px;display:flex;align-items:center;justify-content:center}
+        .cam-view img{width:100%;height:auto;display:block}
+        .cam-view .overlay{position:absolute;top:8px;left:8px;padding:3px 8px;border-radius:4px;
+            font-size:0.6em;background:rgba(0,0,0,0.7);color:var(--gold)}
+        .cam-view .offline-msg{color:#444;font-size:0.9em;text-align:center;padding:40px}
+        .cam-view .offline-msg span{display:block;font-size:2em;margin-bottom:10px}
+        
+        .cam-controls{display:flex;gap:8px;padding:10px 16px;border-top:1px solid rgba(255,255,255,0.03)}
+        .cam-controls button{padding:5px 10px;border-radius:6px;border:1px solid var(--border);
+            background:rgba(245,158,11,0.05);color:var(--gold);font-family:inherit;font-size:0.7em;
+            cursor:pointer;transition:all .2s}
+        .cam-controls button:hover{background:rgba(245,158,11,0.15)}
+        .cam-controls button.active{background:rgba(0,240,255,0.1);border-color:var(--cyan);color:var(--cyan)}
+
+        /* Stats Row */
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+        .stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+        .stat .label{font-size:0.65em;color:#666;margin-bottom:4px}
+        .stat .value{font-family:'Orbitron',sans-serif;font-size:1.1em;color:var(--gold)}
+        .stat .sub{font-size:0.6em;color:#555;margin-top:2px}
+
+        /* Event Log */
+        .log-section{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+        .log-section h3{font-family:'Orbitron',sans-serif;font-size:0.85em;color:var(--purple);margin-bottom:12px}
+        .log-entry{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:0.75em}
+        .log-entry:last-child{border-bottom:none}
+        .log-time{color:#555;min-width:70px}
+        .log-cam{color:var(--cyan);min-width:60px}
+        .log-event{color:#999}
+        .log-event.alert{color:var(--red)}
+        .log-event.motion{color:var(--gold)}
+
+        @media(max-width:600px){
+            .cam-grid{grid-template-columns:1fr}
+            .stats{grid-template-columns:repeat(2,1fr)}
+        }
+    </style>
+</head>
+<body>
+    <!-- NAV -->
+    <div class="nav">
+        <span class="title">👁️ AI VISION CENTER</span>
+        <a href="/">🦁 Hub</a>
+        <a href="/office.html">🏢 Oficina</a>
+        <a href="/trading.html">📈 Trading</a>
+        <a href="/vision.html" class="active">👁️ Vision</a>
+        <a href="/logout">Salir</a>
+        <span class="status" id="connStatus">● CONNECTED</span>
+    </div>
+
+    <div class="main">
+        <!-- STATS -->
+        <div class="stats">
+            <div class="stat">
+                <div class="label">CÁMARAS ONLINE</div>
+                <div class="value" id="camOnline">1 / 2</div>
+                <div class="sub">DGX activa · Jetson pendiente</div>
+            </div>
+            <div class="stat">
+                <div class="label">RESOLUCIÓN</div>
+                <div class="value">1280×720</div>
+                <div class="sub">HD · 5 FPS stream</div>
+            </div>
+            <div class="stat">
+                <div class="label">ÚLTIMO MOVIMIENTO</div>
+                <div class="value" id="lastMotion">—</div>
+                <div class="sub">Detección IA pendiente</div>
+            </div>
+            <div class="stat">
+                <div class="label">UPTIME SISTEMA</div>
+                <div class="value" id="uptime">—</div>
+                <div class="sub">Vision Center v1.0</div>
+            </div>
+        </div>
+
+        <!-- CAMERAS -->
+        <div class="cam-grid">
+            <!-- DGX Camera -->
+            <div class="cam-card">
+                <div class="cam-header">
+                    <h3>📷 DGX SPARKS — Oficina Principal</h3>
+                    <span class="live" id="dgxLive">LIVE</span>
+                </div>
+                <div class="cam-view">
+                    <img id="dgxCam" src="/api/cam/dgx/snapshot" alt="DGX Camera">
+                    <div class="overlay" id="dgxTs">—</div>
+                </div>
+                <div class="cam-controls">
+                    <button onclick="refreshCam('dgx')" class="active" id="dgxAutoBtn">⟳ Auto (2s)</button>
+                    <button onclick="captureCam('dgx')">📸 Captura</button>
+                    <button onclick="toggleFullscreen('dgxCam')">⛶ Full</button>
+                </div>
+            </div>
+
+            <!-- Jetson Camera -->
+            <div class="cam-card">
+                <div class="cam-header">
+                    <h3>📷 JETSON — Laboratorio</h3>
+                    <span class="live" style="color:var(--red)">
+                        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>
+                        OFFLINE
+                    </span>
+                </div>
+                <div class="cam-view">
+                    <div class="offline-msg">
+                        <span>📡</span>
+                        Jetson (192.168.1.137) — Sin acceso SSH<br><br>
+                        <span style="font-size:0.8em;color:#555">Se necesita configurar acceso para activar la cámara</span>
+                    </div>
+                </div>
+                <div class="cam-controls">
+                    <button disabled style="opacity:0.3">⟳ Auto</button>
+                    <button disabled style="opacity:0.3">📸 Captura</button>
+                    <button disabled style="opacity:0.3">⛶ Full</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- EVENT LOG -->
+        <div class="log-section">
+            <h3>📋 REGISTRO DE EVENTOS</h3>
+            <div id="logEntries">
+                <div class="log-entry">
+                    <span class="log-time">18:33</span>
+                    <span class="log-cam">DGX</span>
+                    <span class="log-event">📷 Cámara inicializada — Trust 1080p Full HD</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">18:33</span>
+                    <span class="log-cam">SYS</span>
+                    <span class="log-event">🟢 Vision Center iniciado — Stream activo en puerto 8090</span>
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">18:33</span>
+                    <span class="log-cam">JETSON</span>
+                    <span class="log-event alert">⚠️ Sin conexión — SSH denegado (192.168.1.137)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const CAM_URL = '/api/cam/dgx/snapshot';
+    let dgxAutoRefresh = true;
+    let startTime = Date.now();
+
+    // Auto-refresh DGX camera
+    function refreshDGX() {
+        if (!dgxAutoRefresh) return;
+        const img = document.getElementById('dgxCam');
+        const newImg = new Image();
+        newImg.onload = () => {
+            img.src = newImg.src;
+            const now = new Date();
+            document.getElementById('dgxTs').textContent = 
+                now.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        };
+        newImg.onerror = () => {
+            document.getElementById('dgxLive').textContent = 'ERROR';
+            document.getElementById('dgxLive').style.color = 'var(--red)';
+        };
+        newImg.src = CAM_URL + '?t=' + Date.now();
+    }
+
+    setInterval(refreshDGX, 2500);
+    refreshDGX();
+
+    function refreshCam(cam) {
+        if (cam === 'dgx') {
+            dgxAutoRefresh = !dgxAutoRefresh;
+            const btn = document.getElementById('dgxAutoBtn');
+            btn.textContent = dgxAutoRefresh ? '⟳ Auto (2s)' : '⟳ Pausado';
+            btn.classList.toggle('active', dgxAutoRefresh);
+        }
+    }
+
+    function captureCam(cam) {
+        if (cam === 'dgx') {
+            const img = document.getElementById('dgxCam');
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `dgx-capture-${Date.now()}.jpg`;
+            a.click();
+            addLog('DGX', '📸 Captura guardada');
+        }
+    }
+
+    function toggleFullscreen(id) {
+        const el = document.getElementById(id);
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    }
+
+    function addLog(cam, event, cls='') {
+        const entries = document.getElementById('logEntries');
+        const now = new Date();
+        const time = now.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        div.innerHTML = `<span class="log-time">${time}</span><span class="log-cam">${cam}</span><span class="log-event ${cls}">${event}</span>`;
+        entries.insertBefore(div, entries.firstChild);
+        if (entries.children.length > 50) entries.removeChild(entries.lastChild);
+    }
+
+    // Uptime counter
+    setInterval(() => {
+        const s = Math.floor((Date.now() - startTime) / 1000);
+        const h = Math.floor(s/3600);
+        const m = Math.floor((s%3600)/60);
+        document.getElementById('uptime').textContent = 
+            h > 0 ? `${h}h ${m}m` : `${m}m ${s%60}s`;
+    }, 1000);
+    </script>
+</body>
+</html>
