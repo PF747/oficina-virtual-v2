@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>πφe Oficina Virtual V2 - Cyberpunk Space Command Center</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 50%, #0a0a0a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-logo {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .loading-text {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: #f59e0b;
+            letter-spacing: 0.2rem;
+        }
+
+        .loading-bar {
+            width: 300px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #ec4899, #3b82f6);
+            width: 0%;
+            transition: width 0.3s;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+
+        /* HUD Top Bar */
+        #hud-top {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(180deg, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.7) 100%);
+            border-bottom: 2px solid rgba(245, 158, 11, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .hud-logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #f59e0b;
+            text-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+        }
+
+        .hud-stats {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            color: #f59e0b;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+
+        /* HUD Bottom Bar - Agent Pills */
+        #hud-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem 2rem 2rem 2rem;
+            background: linear-gradient(0deg, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.7) 70%, transparent 100%);
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .agent-pills {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .agent-pill {
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            backdrop-filter: blur(5px);
+        }
+
+        .agent-pill:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 5px 20px;
+        }
+
+        .agent-pill.active {
+            transform: scale(1.1);
+        }
+
+        /* Tooltip */
+        #tooltip {
+            position: fixed;
+            background: rgba(10, 10, 10, 0.95);
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 1rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 200;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        #tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #f59e0b;
+        }
+
+        .tooltip-role {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 0.5rem;
+        }
+
+        .tooltip-status {
+            font-size: 0.8rem;
+            color: #22c55e;
+        }
+
+        /* FPS Counter */
+        #fps-counter {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: rgba(10, 10, 10, 0.8);
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            z-index: 100;
+        }
+
+        /* Mini-map */
+        #minimap {
+            position: fixed;
+            bottom: 120px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(10, 10, 10, 0.8);
+            border: 2px solid rgba(245, 158, 11, 0.5);
+            border-radius: 8px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        #minimap canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 6px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            #hud-top {
+                height: 50px;
+                padding: 0 1rem;
+            }
+
+            .hud-logo {
+                font-size: 1.2rem;
+            }
+
+            .hud-stats {
+                gap: 1rem;
+                font-size: 0.7rem;
+            }
+
+            .agent-pills {
+                gap: 0.5rem;
+            }
+
+            .agent-pill {
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+            }
+
+            #minimap {
+                width: 100px;
+                height: 100px;
+                bottom: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-logo">🦁 πφe</div>
+        <div class="loading-text">INICIANDO COMANDO CENTRAL</div>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loading-progress"></div>
+        </div>
+    </div>
+
+    <!-- Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- HUD Top Bar -->
+    <div id="hud-top">
+        <div class="hud-logo">🦁 πφe COMMAND CENTER</div>
+        <div class="hud-stats">
+            <div class="stat-item">
+                <div class="stat-label">AGENTES</div>
+                <div class="stat-value">10/10</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">PROYECTOS</div>
+                <div class="stat-value">47</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">GPU</div>
+                <div class="stat-value">87%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">HASHRATE</div>
+                <div class="stat-value">2.4 GH/s</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD Bottom Bar -->
+    <div id="hud-bottom">
+        <div class="agent-pills" id="agent-pills"></div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip">
+        <div class="tooltip-name" id="tooltip-name"></div>
+        <div class="tooltip-role" id="tooltip-role"></div>
+        <div class="tooltip-status" id="tooltip-status"></div>
+    </div>
+
+    <!-- FPS Counter -->
+    <div id="fps-counter">FPS: <span id="fps-value">60</span></div>
+
+    <!-- Mini-map -->
+    <div id="minimap">
+        <canvas id="minimap-canvas" width="150" height="150"></canvas>
+    </div>
+
+    <!-- Three.js Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- Main Application -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ==================== CONSTANTS ====================
+        const AGENTS_DATA = [
+            { id: 1, name: 'Torrente', emoji: '🦁', role: 'Director', color: 0xf59e0b, position: [0, 2, 0], area: 'bridge' },
+            { id: 2, name: 'IA', emoji: '🧠', role: 'Jefe IA', color: 0x3b82f6, position: [-15, 0, 15], area: 'innovation' },
+            { id: 3, name: 'Ops', emoji: '🔧', role: 'Operaciones', color: 0x6366f1, position: [-10, 0, 15], area: 'innovation' },
+            { id: 4, name: 'Contable', emoji: '📊', role: 'Finanzas', color: 0x22c55e, position: [15, 0, 10], area: 'general' },
+            { id: 5, name: 'Legal', emoji: '⚖️', role: 'Legal', color: 0x8b5cf6, position: [15, 0, -10], area: 'war' },
+            { id: 6, name: 'Marketing', emoji: '📣', role: 'Marketing', color: 0xec4899, position: [-15, 0, -10], area: 'general' },
+            { id: 7, name: 'Trading', emoji: '📈', role: 'Mercados', color: 0xef4444, position: [-15, 0, 0], area: 'trading' },
+            { id: 8, name: 'Energia', emoji: '⚡', role: 'Energia', color: 0xeab308, position: [10, 0, 15], area: 'general' },
+            { id: 9, name: 'Peter', emoji: '💰', role: 'Trader Sr.', color: 0xf97316, position: [-10, 0, 0], area: 'trading' },
+            { id: 10, name: 'Hercules', emoji: '🛡️', role: 'Seguridad', color: 0x14b8a6, position: [10, 0, -10], area: 'war' }
+        ];
+
+        // ==================== SCENE SETUP ====================
+        let scene, camera, renderer, composer;
+        let controls;
+        let agentMeshes = [];
+        let hologramCenter;
+        let clock = new THREE.Clock();
+        let idleTime = 0;
+        let targetCameraPosition = null;
+        let targetLookAt = null;
+        let isAnimatingCamera = false;
+
+        // FPS Counter
+        let frameCount = 0;
+        let lastFPSUpdate = 0;
+
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.002);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(0, 25, 50);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 100;
+            controls.minDistance = 10;
+            controls.maxPolarAngle = Math.PI / 2;
+
+            // Post-processing
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            
+            const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.5,
+                0.4,
+                0.85
+            );
+            composer.addPass(bloomPass);
+
+            // Lighting
+            createLighting();
+
+            // Environment
+            createStarField();
+            createNebula();
+            createSpaceStation();
+            createCentralHologram();
+            createGlassFloor();
+            createEnergyConduits();
+
+            // Agents
+            createAgents();
+
+            // VIP Area Markers
+            createVIPAreas();
+
+            // UI
+            createAgentPills();
+            setupTooltips();
+            setupMinimap();
+
+            // Events
+            window.addEventListener('resize', onWindowResize);
+            controls.addEventListener('change', () => { idleTime = 0; });
+
+            // Start animation
+            updateLoadingProgress(100);
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.add('hidden');
+                animate();
+            }, 500);
+        }
+
+        // ==================== LIGHTING ====================
+        function createLighting() {
+            // Ambient
+            const ambient = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambient);
+
+            // Main directional (god rays effect)
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+            mainLight.position.set(50, 50, 50);
+            mainLight.castShadow = true;
+            scene.add(mainLight);
+
+            // Colored accent lights
+            const accentLights = [
+                { color: 0xf59e0b, position: [0, 10, 0], intensity: 2 },
+                { color: 0x3b82f6, position: [-20, 5, 20], intensity: 1.5 },
+                { color: 0xef4444, position: [-20, 5, -5], intensity: 1.5 },
+                { color: 0x8b5cf6, position: [20, 5, -15], intensity: 1.5 }
+            ];
+
+            accentLights.forEach(light => {
+                const pointLight = new THREE.PointLight(light.color, light.intensity, 50);
+                pointLight.position.set(...light.position);
+                scene.add(pointLight);
+            });
+        }
+
+        // ==================== STAR FIELD ====================
+        function createStarField() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starPositions = [];
+            const starColors = [];
+
+            for (let i = 0; i < 5000; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                const r = 200 + Math.random() * 300;
+
+                starPositions.push(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta),
+                    r * Math.cos(phi)
+                );
+
+                // Colorful stars
+                const colorChoice = Math.random();
+                if (colorChoice < 0.7) {
+                    starColors.push(1, 1, 1); // White
+                } else if (colorChoice < 0.85) {
+                    starColors.push(0.5, 0.7, 1); // Blue
+                } else {
+                    starColors.push(1, 0.7, 0.5); // Orange
+                }
+            }
+
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+            starsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+
+            const starsMaterial = new THREE.PointsMaterial({
+                size: 0.7,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const stars = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(stars);
+        }
+
+        // ==================== NEBULA ====================
+        function createNebula() {
+            const nebulaGeometry = new THREE.BufferGeometry();
+            const nebulaPositions = [];
+            const nebulaColors = [];
+
+            for (let i = 0; i < 2000; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                const r = 150 + Math.random() * 200;
+
+                nebulaPositions.push(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta),
+                    r * Math.cos(phi)
+                );
+
+                // Purple/pink/blue nebula colors
+                const colorChoice = Math.random();
+                if (colorChoice < 0.4) {
+                    nebulaColors.push(0.6, 0.2, 0.8); // Purple
+                } else if (colorChoice < 0.7) {
+                    nebulaColors.push(0.2, 0.4, 0.9); // Blue
+                } else {
+                    nebulaColors.push(0.9, 0.2, 0.6); // Pink
+                }
+            }
+
+            nebulaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nebulaPositions, 3));
+            nebulaGeometry.setAttribute('color', new THREE.Float32BufferAttribute(nebulaColors, 3));
+
+            const nebulaMaterial = new THREE.PointsMaterial({
+                size: 3,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.3,
+                blending: THREE.AdditiveBlending
+            });
+
+            const nebula = new THREE.Points(nebulaGeometry, nebulaMaterial);
+            scene.add(nebula);
+        }
+
+        // ==================== SPACE STATION ====================
+        function createSpaceStation() {
+            // Main ring structure
+            const ringGeometry = new THREE.TorusGeometry(30, 2, 16, 100);
+            const ringMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a2e,
+                metalness: 0.8,
+                roughness: 0.2,
+                emissive: 0x0a0a1a,
+                emissiveIntensity: 0.5
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            scene.add(ring);
+
+            // Inner ring with windows
+            const innerRingGeometry = new THREE.TorusGeometry(28, 1.5, 16, 100);
+            const innerRingMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2a2a4e,
+                metalness: 0.9,
+                roughness: 0.1,
+                emissive: 0xf59e0b,
+                emissiveIntensity: 0.3
+            });
+            const innerRing = new THREE.Mesh(innerRingGeometry, innerRingMaterial);
+            innerRing.rotation.x = Math.PI / 2;
+            scene.add(innerRing);
+
+            // Support beams
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const beamGeometry = new THREE.CylinderGeometry(0.3, 0.3, 10, 8);
+                const beamMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x3a3a5e,
+                    metalness: 0.9,
+                    roughness: 0.1,
+                    emissive: 0x1a1a3e,
+                    emissiveIntensity: 0.5
+                });
+                const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+                beam.position.set(
+                    Math.cos(angle) * 30,
+                    0,
+                    Math.sin(angle) * 30
+                );
+                scene.add(beam);
+            }
+
+            // Main platform floor
+            const platformGeometry = new THREE.CylinderGeometry(25, 25, 0.5, 64);
+            const platformMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a2e,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.position.y = -0.25;
+            scene.add(platform);
+
+            // Glowing edge lights on platform
+            const edgeLightsGeometry = new THREE.TorusGeometry(25, 0.1, 8, 100);
+            const edgeLightsMaterial = new THREE.MeshBasicMaterial({
+                color: 0xf59e0b,
+                transparent: true,
+                opacity: 0.8
+            });
+            const edgeLights = new THREE.Mesh(edgeLightsGeometry, edgeLightsMaterial);
+            edgeLights.position.y = 0;
+            edgeLights.rotation.x = Math.PI / 2;
+            scene.add(edgeLights);
+        }
+
+        // ==================== CENTRAL HOLOGRAM ====================
+        function createCentralHologram() {
+            const hologramGroup = new THREE.Group();
+            hologramGroup.position.y = 3;
+
+            // Rotating data rings
+            for (let i = 0; i < 3; i++) {
+                const ringGeometry = new THREE.TorusGeometry(2 + i * 0.5, 0.05, 8, 64);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.rotation.x = Math.PI / 2 + (i * 0.1);
+                ring.userData.rotationSpeed = 0.5 + i * 0.2;
+                hologramGroup.add(ring);
+            }
+
+            // Central sphere with data visualization
+            const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+            const sphereMaterial = new THREE.MeshBasicMaterial({
+                color: 0xf59e0b,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.7
+            });
+            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            hologramGroup.add(sphere);
+
+            // Particle system around hologram
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesPositions = [];
+            for (let i = 0; i < 100; i++) {
+                particlesPositions.push(
+                    (Math.random() - 0.5) * 5,
+                    (Math.random() - 0.5) * 5,
+                    (Math.random() - 0.5) * 5
+                );
+            }
+            particlesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(particlesPositions, 3));
+            const particlesMaterial = new THREE.PointsMaterial({
+                color: 0x00ffff,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            hologramGroup.add(particles);
+
+            hologramCenter = hologramGroup;
+            scene.add(hologramGroup);
+        }
+
+        // ==================== GLASS FLOOR ====================
+        function createGlassFloor() {
+            const glassGeometry = new THREE.CircleGeometry(10, 64);
+            const glassMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0.15,
+                roughness: 0.1,
+                metalness: 0.1,
+                transmission: 0.9,
+                thickness: 0.5
+            });
+            const glass = new THREE.Mesh(glassGeometry, glassMaterial);
+            glass.rotation.x = -Math.PI / 2;
+            glass.position.y = -0.4;
+            scene.add(glass);
+
+            // Grid lines underneath
+            const gridGeometry = new THREE.CircleGeometry(10, 32);
+            const gridMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.3
+            });
+            const grid = new THREE.Mesh(gridGeometry, gridMaterial);
+            grid.rotation.x = -Math.PI / 2;
+            grid.position.y = -0.5;
+            scene.add(grid);
+        }
+
+        // ==================== ENERGY CONDUITS ====================
+        function createEnergyConduits() {
+            const conduitMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            // Create flowing energy lines between areas
+            const connections = [
+                [[0, 2, 0], [-15, 0, 15]],
+                [[0, 2, 0], [-15, 0, 0]],
+                [[0, 2, 0], [15, 0, -10]],
+                [[-15, 0, 15], [-10, 0, 0]],
+                [[15, 0, -10], [10, 0, -10]]
+            ];
+
+            connections.forEach(([start, end]) => {
+                const curve = new THREE.QuadraticBezierCurve3(
+                    new THREE.Vector3(...start),
+                    new THREE.Vector3((start[0] + end[0]) / 2, Math.max(start[1], end[1]) + 5, (start[2] + end[2]) / 2),
+                    new THREE.Vector3(...end)
+                );
+
+                const points = curve.getPoints(50);
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(lineGeometry, conduitMaterial);
+                scene.add(line);
+
+                // Animated particles along conduit
+                const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const particle = new THREE.Mesh(particleGeometry, conduitMaterial);
+                particle.userData.curve = curve;
+                particle.userData.progress = Math.random();
+                scene.add(particle);
+            });
+        }
+
+        // ==================== AGENTS ====================
+        function createAgents() {
+            AGENTS_DATA.forEach(agentData => {
+                const agentGroup = new THREE.Group();
+                agentGroup.position.set(...agentData.position);
+                agentGroup.userData = agentData;
+
+                // Humanoid figure
+                const humanoid = createHumanoid(agentData.color);
+                agentGroup.add(humanoid);
+
+                // Desk/Workstation
+                const desk = createDesk(agentData.color, agentData.area === 'bridge');
+                agentGroup.add(desk);
+
+                // Holographic screens
+                const screens = createHolographicScreens(agentData.color);
+                agentGroup.add(screens);
+
+                // Name label
+                const label = createTextSprite(`${agentData.emoji} ${agentData.name}`, agentData.color);
+                label.position.y = 4;
+                agentGroup.add(label);
+
+                // Glow effect
+                const glowLight = new THREE.PointLight(agentData.color, 2, 10);
+                glowLight.position.y = 2;
+                agentGroup.add(glowLight);
+
+                agentMeshes.push(agentGroup);
+                scene.add(agentGroup);
+            });
+        }
+
+        function createHumanoid(color) {
+            const humanoid = new THREE.Group();
+
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.5,
+                metalness: 0.3,
+                roughness: 0.7
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 2.5;
+            humanoid.add(head);
+
+            // Body (capsule)
+            const bodyGeometry = new THREE.CapsuleGeometry(0.4, 1.2, 8, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(color).multiplyScalar(0.6),
+                metalness: 0.2,
+                roughness: 0.8
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 1.5;
+            humanoid.add(body);
+
+            // Arms
+            const armGeometry = new THREE.CylinderGeometry(0.12, 0.12, 1, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(color).multiplyScalar(0.7),
+                metalness: 0.2,
+                roughness: 0.8
+            });
+
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.6, 1.8, 0);
+            leftArm.rotation.z = 0.3;
+            humanoid.add(leftArm);
+
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.6, 1.8, 0);
+            rightArm.rotation.z = -0.3;
+            humanoid.add(rightArm);
+
+            // Legs
+            const legGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(color).multiplyScalar(0.5),
+                metalness: 0.2,
+                roughness: 0.8
+            });
+
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.25, 0.5, 0);
+            humanoid.add(leftLeg);
+
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.25, 0.5, 0);
+            humanoid.add(rightLeg);
+
+            // Store for animation
+            humanoid.userData.arms = [leftArm, rightArm];
+
+            return humanoid;
+        }
+
+        function createDesk(color, isLarge = false) {
+            const desk = new THREE.Group();
+            const size = isLarge ? 2 : 1.5;
+
+            // Desk surface
+            const deskGeometry = new THREE.BoxGeometry(size, 0.1, size);
+            const deskMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2a2a4e,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            const deskSurface = new THREE.Mesh(deskGeometry, deskMaterial);
+            deskSurface.position.y = 1;
+            desk.add(deskSurface);
+
+            // Desk legs
+            const legGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a2e,
+                metalness: 0.9,
+                roughness: 0.1
+            });
+
+            const positions = [
+                [-size/2 + 0.2, 0.5, -size/2 + 0.2],
+                [size/2 - 0.2, 0.5, -size/2 + 0.2],
+                [-size/2 + 0.2, 0.5, size/2 - 0.2],
+                [size/2 - 0.2, 0.5, size/2 - 0.2]
+            ];
+
+            positions.forEach(pos => {
+                const leg = new THREE.Mesh(legGeometry, legMaterial);
+                leg.position.set(...pos);
+                desk.add(leg);
+            });
+
+            // Glowing edge
+            const edgeGeometry = new THREE.EdgesGeometry(deskGeometry);
+            const edgeMaterial = new THREE.LineBasicMaterial({ color: color });
+            const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+            edges.position.y = 1;
+            desk.add(edges);
+
+            return desk;
+        }
+
+        function createHolographicScreens(color) {
+            const screens = new THREE.Group();
+
+            for (let i = 0; i < 2; i++) {
+                const screenGeometry = new THREE.PlaneGeometry(1, 0.7);
+                const screenMaterial = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide
+                });
+                const screen = new THREE.Mesh(screenGeometry, screenMaterial);
+                screen.position.set(i * 0.6 - 0.3, 1.8, -0.7);
+                screens.add(screen);
+
+                // Screen frame
+                const frameGeometry = new THREE.EdgesGeometry(screenGeometry);
+                const frameMaterial = new THREE.LineBasicMaterial({ color: color });
+                const frame = new THREE.LineSegments(frameGeometry, frameMaterial);
+                frame.position.copy(screen.position);
+                screens.add(frame);
+            }
+
+            return screens;
+        }
+
+        function createTextSprite(text, color) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 128;
+
+            context.fillStyle = `#${new THREE.Color(color).getHexString()}`;
+            context.font = 'Bold 48px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, 256, 64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(4, 1, 1);
+
+            return sprite;
+        }
+
+        // ==================== VIP AREAS ====================
+        function createVIPAreas() {
+            // Director's Bridge (elevated)
+            const bridgeGeometry = new THREE.CylinderGeometry(4, 4, 0.2, 32);
+            const bridgeMaterial = new THREE.MeshStandardMaterial({
+                color: 0xf59e0b,
+                metalness: 0.8,
+                roughness: 0.2,
+                emissive: 0xf59e0b,
+                emissiveIntensity: 0.3
+            });
+            const bridge = new THREE.Mesh(bridgeGeometry, bridgeMaterial);
+            bridge.position.set(0, 0.1, 0);
+            scene.add(bridge);
+
+            // Trading Floor markers
+            createAreaMarker([-12.5, 0, 0], 0xef4444, 'TRADING FLOOR');
+
+            // War Room markers
+            createAreaMarker([12.5, 0, -10], 0x8b5cf6, 'WAR ROOM');
+
+            // Innovation Lab markers
+            createAreaMarker([-12.5, 0, 15], 0x3b82f6, 'INNOVATION LAB');
+        }
+
+        function createAreaMarker(position, color, text) {
+            const markerGeometry = new THREE.RingGeometry(2, 2.5, 32);
+            const markerMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+            marker.rotation.x = -Math.PI / 2;
+            marker.position.set(position[0], 0.01, position[2]);
+            scene.add(marker);
+
+            // Area light
+            const areaLight = new THREE.PointLight(color, 1, 15);
+            areaLight.position.set(position[0], 5, position[2]);
+            scene.add(areaLight);
+        }
+
+        // ==================== UI FUNCTIONS ====================
+        function createAgentPills() {
+            const pillsContainer = document.getElementById('agent-pills');
+            AGENTS_DATA.forEach(agent => {
+                const pill = document.createElement('div');
+                pill.className = 'agent-pill';
+                pill.style.borderColor = `#${new THREE.Color(agent.color).getHexString()}`;
+                pill.style.color = `#${new THREE.Color(agent.color).getHexString()}`;
+                pill.innerHTML = `${agent.emoji} ${agent.name}`;
+                
+                pill.addEventListener('click', () => {
+                    flyToAgent(agent.id);
+                    document.querySelectorAll('.agent-pill').forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                });
+
+                pill.addEventListener('mouseenter', () => {
+                    pill.style.boxShadow = `0 5px 20px #${new THREE.Color(agent.color).getHexString()}`;
+                });
+
+                pill.addEventListener('mouseleave', () => {
+                    pill.style.boxShadow = '';
+                });
+
+                pillsContainer.appendChild(pill);
+            });
+        }
+
+        function setupTooltips() {
+            const tooltip = document.getElementById('tooltip');
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(agentMeshes, true);
+
+                if (intersects.length > 0) {
+                    const agent = intersects[0].object.parent.userData || intersects[0].object.parent.parent.userData;
+                    if (agent && agent.name) {
+                        document.getElementById('tooltip-name').textContent = `${agent.emoji} ${agent.name}`;
+                        document.getElementById('tooltip-role').textContent = agent.role;
+                        document.getElementById('tooltip-status').textContent = '● ACTIVO';
+                        
+                        tooltip.style.left = event.clientX + 15 + 'px';
+                        tooltip.style.top = event.clientY + 15 + 'px';
+                        tooltip.classList.add('visible');
+                        return;
+                    }
+                }
+                tooltip.classList.remove('visible');
+            });
+        }
+
+        function setupMinimap() {
+            const minimapCanvas = document.getElementById('minimap-canvas');
+            const ctx = minimapCanvas.getContext('2d');
+
+            setInterval(() => {
+                ctx.fillStyle = 'rgba(10, 10, 10, 0.8)';
+                ctx.fillRect(0, 0, 150, 150);
+
+                // Draw station ring
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(75, 75, 50, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Draw agents
+                agentMeshes.forEach(agent => {
+                    const x = 75 + (agent.position.x / 30) * 50;
+                    const z = 75 + (agent.position.z / 30) * 50;
+                    ctx.fillStyle = `#${new THREE.Color(agent.userData.color).getHexString()}`;
+                    ctx.beginPath();
+                    ctx.arc(x, z, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Draw camera position
+                const camX = 75 + (camera.position.x / 30) * 50;
+                const camZ = 75 + (camera.position.z / 30) * 50;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(camX, camZ, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }, 100);
+        }
+
+        // ==================== CAMERA ANIMATION ====================
+        function flyToAgent(agentId) {
+            const agent = agentMeshes.find(a => a.userData.id === agentId);
+            if (!agent) return;
+
+            const offset = new THREE.Vector3(5, 8, 10);
+            targetCameraPosition = agent.position.clone().add(offset);
+            targetLookAt = agent.position.clone();
+            targetLookAt.y += 2;
+            isAnimatingCamera = true;
+            idleTime = 0;
+        }
+
+        function updateCameraAnimation() {
+            if (isAnimatingCamera && targetCameraPosition && targetLookAt) {
+                camera.position.lerp(targetCameraPosition, 0.05);
+                
+                const currentLookAt = new THREE.Vector3();
+                camera.getWorldDirection(currentLookAt);
+                currentLookAt.multiplyScalar(10).add(camera.position);
+                currentLookAt.lerp(targetLookAt, 0.05);
+                
+                controls.target.copy(targetLookAt);
+
+                if (camera.position.distanceTo(targetCameraPosition) < 0.5) {
+                    isAnimatingCamera = false;
+                    targetCameraPosition = null;
+                    targetLookAt = null;
+                }
+            }
+        }
+
+        // ==================== ANIMATIONS ====================
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+            idleTime += delta;
+
+            // Rotate central hologram
+            if (hologramCenter) {
+                hologramCenter.rotation.y += delta * 0.5;
+                hologramCenter.children.forEach(child => {
+                    if (child.userData.rotationSpeed) {
+                        child.rotation.z += delta * child.userData.rotationSpeed;
+                    }
+                });
+            }
+
+            // Animate agents (typing motion)
+            agentMeshes.forEach((agent, index) => {
+                const humanoid = agent.children[0];
+                if (humanoid && humanoid.userData.arms) {
+                    const [leftArm, rightArm] = humanoid.userData.arms;
+                    const offset = index * 1.5;
+                    leftArm.rotation.x = Math.sin(elapsedTime * 2 + offset) * 0.3;
+                    rightArm.rotation.x = Math.sin(elapsedTime * 2 + offset + Math.PI) * 0.3;
+                }
+
+                // Gentle bobbing
+                agent.position.y = agent.userData.position[1] + Math.sin(elapsedTime + index) * 0.1;
+            });
+
+            // Animate energy particles along conduits
+            scene.children.forEach(child => {
+                if (child.userData.curve) {
+                    child.userData.progress += delta * 0.1;
+                    if (child.userData.progress > 1) child.userData.progress = 0;
+                    const point = child.userData.curve.getPoint(child.userData.progress);
+                    child.position.copy(point);
+                }
+            });
+
+            // Auto-rotate when idle
+            if (idleTime > 5 && !isAnimatingCamera) {
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.5;
+            } else {
+                controls.autoRotate = false;
+            }
+
+            // Update camera animation
+            updateCameraAnimation();
+
+            // Update controls
+            controls.update();
+
+            // Render
+            composer.render();
+
+            // FPS Counter
+            frameCount++;
+            const now = performance.now();
+            if (now >= lastFPSUpdate + 1000) {
+                document.getElementById('fps-value').textContent = frameCount;
+                frameCount = 0;
+                lastFPSUpdate = now;
+            }
+        }
+
+        // ==================== WINDOW RESIZE ====================
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ==================== LOADING PROGRESS ====================
+        function updateLoadingProgress(percent) {
+            document.getElementById('loading-progress').style.width = percent + '%';
+        }
+
+        // ==================== START ====================
+        // Simulate loading
+        let progress = 0;
+        const loadingInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(loadingInterval);
+            }
+            updateLoadingProgress(progress);
+        }, 200);
+
+        // Initialize when page loads
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
