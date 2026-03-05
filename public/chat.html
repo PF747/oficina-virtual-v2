@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💬 Chat Interno - πφe Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050510;
+            --panel: #0a0a1a;
+            --border: #1a1a2e;
+            --gold: #f59e0b;
+            --gold-dim: #92400e;
+            --cyan: #06b6d4;
+            --red: #ef4444;
+            --text: #e5e7eb;
+            --text-dim: #9ca3af;
+            --hover: #1e1e3f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Starfield background */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.3;
+        }
+
+        /* Main layout */
+        .chat-container {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 240px 1fr 280px;
+            height: 100vh;
+        }
+
+        /* Left sidebar - channels */
+        .channels-sidebar {
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--gold);
+            text-align: center;
+        }
+
+        .channel-section {
+            padding: 1rem 0;
+        }
+
+        .section-title {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .channel-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            position: relative;
+        }
+
+        .channel-item:hover {
+            background: var(--hover);
+        }
+
+        .channel-item.active {
+            background: var(--gold-dim);
+            color: var(--gold);
+            font-weight: 700;
+        }
+
+        .channel-icon {
+            font-size: 1rem;
+        }
+
+        .channel-name {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        .unread-badge {
+            background: var(--red);
+            color: white;
+            border-radius: 12px;
+            padding: 0.1rem 0.4rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* Center - messages */
+        .messages-panel {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+        }
+
+        .messages-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .channel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .channel-desc {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .messages-feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .message:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .avatar-jefe {
+            background: var(--gold);
+            color: var(--bg);
+        }
+
+        .avatar-agent {
+            background: var(--cyan);
+            color: var(--bg);
+        }
+
+        .avatar-system {
+            background: var(--red);
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .message-sender {
+            font-weight: 700;
+        }
+
+        .sender-jefe {
+            color: var(--gold);
+        }
+
+        .sender-agent {
+            color: var(--cyan);
+        }
+
+        .sender-system {
+            color: var(--red);
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .message-text {
+            color: var(--text);
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .message-reply-to {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid var(--gold);
+            padding: 0.25rem 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            border-radius: 2px;
+        }
+
+        .message-actions {
+            opacity: 0;
+            transition: opacity 0.2s;
+            margin-top: 0.25rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .message:hover .message-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--hover);
+            color: var(--gold);
+        }
+
+        /* Message input */
+        .message-input-area {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            background: var(--panel);
+        }
+
+        .reply-preview {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid var(--gold);
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: none;
+            font-size: 0.85rem;
+            border-radius: 3px;
+        }
+
+        .reply-preview.active {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reply-close {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0 0.5rem;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #messageInput {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            resize: none;
+            max-height: 120px;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .input-btn {
+            background: var(--gold);
+            color: var(--bg);
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .input-btn:hover {
+            background: var(--gold);
+            filter: brightness(1.2);
+        }
+
+        .input-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .emoji-btn {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+        }
+
+        .emoji-btn:hover {
+            border-color: var(--gold);
+        }
+
+        /* Emoji picker */
+        .emoji-picker {
+            position: absolute;
+            bottom: 100%;
+            right: 1rem;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            display: none;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 0.5rem;
+            max-width: 320px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .emoji-picker.active {
+            display: grid;
+        }
+
+        .emoji {
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+            text-align: center;
+        }
+
+        .emoji:hover {
+            background: var(--hover);
+        }
+
+        /* Right sidebar - info */
+        .info-sidebar {
+            background: var(--panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .info-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .info-section {
+            padding: 1rem;
+        }
+
+        .info-section-title {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .member-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--bg);
+        }
+
+        .member-name {
+            font-size: 0.85rem;
+        }
+
+        /* Loading state */
+        .loading {
+            text-align: center;
+            color: var(--text-dim);
+            padding: 2rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gold-dim);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starfield"></canvas>
+
+    <div class="chat-container">
+        <!-- Left sidebar - Channels -->
+        <div class="channels-sidebar">
+            <div class="sidebar-header">💬 Chat Interno</div>
+            
+            <div class="channel-section">
+                <div class="section-title">📢 General</div>
+                <div id="generalChannels"></div>
+            </div>
+
+            <div class="channel-section">
+                <div class="section-title">🏢 Departamentos</div>
+                <div id="departmentChannels"></div>
+            </div>
+
+            <div class="channel-section">
+                <div class="section-title">⚙️ Sistema</div>
+                <div id="systemChannels"></div>
+            </div>
+        </div>
+
+        <!-- Center - Messages -->
+        <div class="messages-panel">
+            <div class="messages-header">
+                <span class="channel-icon" id="currentChannelIcon">📢</span>
+                <div>
+                    <div class="channel-title" id="currentChannelName">Selecciona un canal</div>
+                    <div class="channel-desc" id="currentChannelDesc"></div>
+                </div>
+            </div>
+
+            <div class="messages-feed" id="messagesFeed">
+                <div class="loading">Cargando mensajes...</div>
+            </div>
+
+            <div class="message-input-area">
+                <div class="reply-preview" id="replyPreview">
+                    <span id="replyText"></span>
+                    <button class="reply-close" onclick="clearReply()">✕</button>
+                </div>
+
+                <div class="input-row">
+                    <button class="emoji-btn" onclick="toggleEmojiPicker()">😊</button>
+                    <textarea id="messageInput" placeholder="Escribe un mensaje..." rows="1"></textarea>
+                    <button class="input-btn" onclick="sendMessage()">Enviar</button>
+                </div>
+
+                <div class="emoji-picker" id="emojiPicker"></div>
+            </div>
+        </div>
+
+        <!-- Right sidebar - Info -->
+        <div class="info-sidebar">
+            <div class="info-header">Información del Canal</div>
+            
+            <div class="info-section">
+                <div class="info-section-title">Miembros</div>
+                <div id="membersList">
+                    <div class="member-item">
+                        <div class="member-avatar">T</div>
+                        <div class="member-name">torrente</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="info-section-title">Estadísticas</div>
+                <div style="font-size: 0.85rem; color: var(--text-dim);">
+                    <div>Mensajes: <span id="messageCount">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let channels = [];
+        let currentChannel = null;
+        let messages = [];
+        let lastMessageId = 0;
+        let replyingTo = null;
+        let pollInterval = null;
+
+        // Channel icons
+        const channelIcons = {
+            general: '📢',
+            trading: '📈',
+            ia: '🤖',
+            seguridad: '🔒',
+            energia: '⚡',
+            dev: '💻',
+            finanzas: '💰',
+            ops: '⚙️',
+            system: '🔔'
+        };
+
+        // Init starfield
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const stars = Array(200).fill().map(() => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 1.5,
+            opacity: Math.random()
+        }));
+
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(star => {
+                ctx.fillStyle = `rgba(245, 158, 11, ${star.opacity})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                ctx.fill();
+                star.opacity += (Math.random() - 0.5) * 0.02;
+                star.opacity = Math.max(0.1, Math.min(1, star.opacity));
+            });
+            requestAnimationFrame(drawStars);
+        }
+        drawStars();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Init emoji picker
+        const emojis = ['😀','😃','😄','😁','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✋','🤚','🖐️','🖖','👋','🤝','💪','🙏','✍️','💅','🤳','💃','🕺','👯','🧘','🛀','🛌','🔥','⚡','💥','✨','🌟','⭐','🎉','🎊','🎈','🎁','🏆','🥇','🥈','🥉','🏅','🎖️','💎','💰','💵','💴','💶','💷','💸','💳','🧾'];
+        document.getElementById('emojiPicker').innerHTML = emojis.map(e => `<span class="emoji" onclick="insertEmoji('${e}')">${e}</span>`).join('');
+
+        // Load channels
+        async function loadChannels() {
+            try {
+                const res = await fetch('/api/chat/channels');
+                channels = await res.json();
+                
+                const generalDiv = document.getElementById('generalChannels');
+                const deptDiv = document.getElementById('departmentChannels');
+                const sysDiv = document.getElementById('systemChannels');
+
+                generalDiv.innerHTML = '';
+                deptDiv.innerHTML = '';
+                sysDiv.innerHTML = '';
+
+                channels.forEach(ch => {
+                    const icon = channelIcons[ch.name] || '💬';
+                    const item = document.createElement('div');
+                    item.className = 'channel-item';
+                    item.innerHTML = `
+                        <span class="channel-icon">${icon}</span>
+                        <span class="channel-name">#${ch.name}</span>
+                    `;
+                    item.onclick = () => selectChannel(ch);
+
+                    if (ch.type === 'general') generalDiv.appendChild(item);
+                    else if (ch.type === 'system') sysDiv.appendChild(item);
+                    else deptDiv.appendChild(item);
+                });
+
+                // Select first channel
+                if (channels.length > 0) {
+                    selectChannel(channels[0]);
+                }
+            } catch (err) {
+                console.error('Error loading channels:', err);
+            }
+        }
+
+        // Select channel
+        function selectChannel(channel) {
+            currentChannel = channel;
+            lastMessageId = 0;
+            messages = [];
+
+            // Update UI
+            document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget?.classList.add('active');
+
+            const icon = channelIcons[channel.name] || '💬';
+            document.getElementById('currentChannelIcon').textContent = icon;
+            document.getElementById('currentChannelName').textContent = `#${channel.name}`;
+            document.getElementById('currentChannelDesc').textContent = channel.description || '';
+
+            // Load messages
+            loadMessages();
+
+            // Start polling
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(() => loadMessages(true), 3000);
+        }
+
+        // Load messages
+        async function loadMessages(polling = false) {
+            if (!currentChannel) return;
+
+            try {
+                const url = `/api/chat/messages?channel_id=${currentChannel.id}&limit=50${polling && lastMessageId ? `&after=${lastMessageId}` : ''}`;
+                const res = await fetch(url);
+                const newMessages = await res.json();
+
+                if (polling && newMessages.length === 0) return;
+
+                if (polling) {
+                    messages.push(...newMessages);
+                } else {
+                    messages = newMessages;
+                }
+
+                if (messages.length > 0) {
+                    lastMessageId = Math.max(...messages.map(m => m.id));
+                }
+
+                renderMessages();
+                document.getElementById('messageCount').textContent = messages.length;
+            } catch (err) {
+                console.error('Error loading messages:', err);
+            }
+        }
+
+        // Render messages
+        function renderMessages() {
+            const feed = document.getElementById('messagesFeed');
+            const shouldScroll = feed.scrollHeight - feed.scrollTop <= feed.clientHeight + 100;
+
+            feed.innerHTML = messages.map(msg => {
+                const role = msg.sender_role || 'agent';
+                const initial = msg.sender[0].toUpperCase();
+                const time = formatTime(msg.created_at);
+
+                let replyHtml = '';
+                if (msg.reply_to) {
+                    const replyMsg = messages.find(m => m.id === msg.reply_to);
+                    if (replyMsg) {
+                        replyHtml = `<div class="message-reply-to">↩️ ${replyMsg.sender}: ${replyMsg.content.substring(0, 50)}...</div>`;
+                    }
+                }
+
+                return `
+                    <div class="message">
+                        <div class="message-avatar avatar-${role}">${initial}</div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <span class="message-sender sender-${role}">${msg.sender}</span>
+                                <span class="message-time">${time}</span>
+                            </div>
+                            ${replyHtml}
+                            <div class="message-text">${escapeHtml(msg.content)}</div>
+                            <div class="message-actions">
+                                <button class="action-btn" onclick="replyToMessage(${msg.id}, '${escapeHtml(msg.sender)}', '${escapeHtml(msg.content).substring(0, 30)}')">↩️ Responder</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (shouldScroll) {
+                feed.scrollTop = feed.scrollHeight;
+            }
+        }
+
+        // Format time
+        function formatTime(timestamp) {
+            const now = new Date();
+            const then = new Date(timestamp);
+            const diff = Math.floor((now - then) / 1000);
+
+            if (diff < 60) return 'ahora';
+            if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
+            if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+            return then.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        }
+
+        // Send message
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentChannel) return;
+
+            try {
+                const payload = {
+                    channel_id: currentChannel.id,
+                    content: content
+                };
+
+                if (replyingTo) {
+                    payload.reply_to = replyingTo;
+                }
+
+                await fetch('/api/chat/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                input.value = '';
+                clearReply();
+                loadMessages(true);
+            } catch (err) {
+                console.error('Error sending message:', err);
+            }
+        }
+
+        // Reply to message
+        function replyToMessage(id, sender, preview) {
+            replyingTo = id;
+            document.getElementById('replyPreview').classList.add('active');
+            document.getElementById('replyText').textContent = `Respondiendo a ${sender}: ${preview}...`;
+            document.getElementById('messageInput').focus();
+        }
+
+        // Clear reply
+        function clearReply() {
+            replyingTo = null;
+            document.getElementById('replyPreview').classList.remove('active');
+        }
+
+        // Toggle emoji picker
+        function toggleEmojiPicker() {
+            document.getElementById('emojiPicker').classList.toggle('active');
+        }
+
+        // Insert emoji
+        function insertEmoji(emoji) {
+            const input = document.getElementById('messageInput');
+            input.value += emoji;
+            input.focus();
+            document.getElementById('emojiPicker').classList.remove('active');
+        }
+
+        // Close emoji picker when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.emoji-btn') && !e.target.closest('.emoji-picker')) {
+                document.getElementById('emojiPicker').classList.remove('active');
+            }
+        });
+
+        // Handle Enter key
+        document.getElementById('messageInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Auto-resize textarea
+        document.getElementById('messageInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Init
+        loadChannels();
+    </script>
+</body>
+</html>

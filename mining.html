@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⛏️ Mining Dashboard — Antminer L7</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--gold:#f59e0b;--bg:#050510;--panel:rgba(8,12,30,0.9);--border:rgba(245,158,11,0.2);--cyan:#00f0ff;--purple:#b829ff;--green:#00ff88;--red:#ff3366}
+        body{min-height:100vh;background:var(--bg);font-family:'JetBrains Mono',monospace;color:#c8d6e5;overflow-x:hidden;padding:20px}
+        canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+        
+        .container{position:relative;z-index:1;max-width:1400px;margin:0 auto}
+        
+        /* Header */
+        .header{text-align:center;margin-bottom:30px}
+        .header h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.5em,4vw,2.5em);font-weight:900;letter-spacing:4px;
+            background:linear-gradient(90deg,var(--gold),#fff,var(--gold));background-size:200% auto;
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite}
+        @keyframes shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+        .header .sub{color:#666;font-size:0.8em;margin-top:8px}
+        .back{display:inline-block;margin-bottom:20px;padding:8px 16px;background:var(--panel);border:1px solid var(--border);
+            border-radius:8px;color:var(--gold);text-decoration:none;font-size:0.8em;transition:all .3s}
+        .back:hover{border-color:var(--gold);transform:translateX(-4px)}
+        
+        /* Top Stats Row */
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;margin-bottom:25px}
+        .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;
+            position:relative;overflow:hidden}
+        .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+            background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0.6}
+        .stat-card .label{font-size:0.7em;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+        .stat-card .value{font-family:'Orbitron',sans-serif;font-size:1.6em;color:#fff;font-weight:700}
+        .stat-card .trend{font-size:0.9em;margin-top:4px}
+        .trend.up{color:var(--green)}
+        .trend.down{color:var(--red)}
+        .badge-alive{display:inline-block;padding:3px 10px;border-radius:6px;font-size:0.65em;background:rgba(0,255,136,0.15);
+            color:var(--green);border:1px solid rgba(0,255,136,0.3);font-weight:600}
+        .badge-dead{background:rgba(255,51,102,0.15);color:var(--red);border-color:rgba(255,51,102,0.3)}
+        
+        /* Main Grid */
+        .main-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px}
+        
+        /* Panel */
+        .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative}
+        .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+            background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0.5}
+        .panel h2{font-family:'Orbitron',sans-serif;font-size:0.95em;color:var(--gold);margin-bottom:15px;
+            letter-spacing:2px;text-transform:uppercase}
+        
+        /* Hashrate Chart */
+        #hashChart{width:100%;height:300px;background:rgba(0,0,0,0.3);border-radius:8px;border:1px solid rgba(255,255,255,0.05)}
+        
+        /* Temperature Gauges */
+        .temp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
+        .temp-gauge{text-align:center}
+        .temp-gauge canvas{display:block;margin:0 auto 8px}
+        .temp-gauge .label{font-size:0.7em;color:#888;text-transform:uppercase}
+        .temp-gauge .value{font-size:1.1em;color:#fff;font-weight:600;margin-top:4px}
+        
+        /* Grid Layout for Bottom Panels */
+        .bottom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-bottom:20px}
+        
+        /* Pool Info */
+        .pool-info table{width:100%;font-size:0.8em}
+        .pool-info td{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+        .pool-info td:first-child{color:#888}
+        .pool-info td:last-child{color:#fff;text-align:right}
+        
+        /* Fan Speed */
+        .fan-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+        .fan-item{background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:12px;text-align:center}
+        .fan-item .fan-icon{font-size:2em;animation:spin 2s linear infinite}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        .fan-item .rpm{font-size:1.2em;color:#fff;font-weight:600;margin-top:6px}
+        .fan-item .label{font-size:0.7em;color:#888;margin-top:4px}
+        .fan-item.normal{border-color:rgba(0,255,136,0.3)}
+        .fan-item.warning{border-color:rgba(245,158,11,0.3)}
+        
+        /* Profitability */
+        .profit-table{width:100%;font-size:0.8em;margin-top:10px}
+        .profit-table th{text-align:left;color:#888;font-weight:400;padding:8px;border-bottom:1px solid rgba(255,255,255,0.1)}
+        .profit-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)}
+        .profit-table tr:last-child td{border:none}
+        .profit-highlight{color:var(--gold);font-weight:600}
+        
+        /* Pool Comparison */
+        .pool-compare{margin-top:15px;font-size:0.75em}
+        .pool-compare table{width:100%;margin-top:8px}
+        .pool-compare th{text-align:left;color:#666;padding:6px;border-bottom:1px solid rgba(255,255,255,0.1);font-weight:400}
+        .pool-compare td{padding:6px;border-bottom:1px solid rgba(255,255,255,0.03)}
+        .pool-compare .current{color:var(--green)}
+        
+        /* History Log */
+        .log{background:rgba(0,0,0,0.4);border-radius:8px;padding:15px;max-height:200px;overflow-y:auto;
+            font-size:0.75em;line-height:1.8;border:1px solid rgba(255,255,255,0.05)}
+        .log-entry{display:flex;gap:10px;margin-bottom:4px}
+        .log-time{color:#666;min-width:60px}
+        .log-msg{color:#aaa}
+        .log-msg.success{color:var(--green)}
+        .log-msg.warning{color:var(--gold)}
+        .log-msg.error{color:var(--red)}
+        .log::-webkit-scrollbar{width:4px}
+        .log::-webkit-scrollbar-thumb{background:rgba(245,158,11,0.3);border-radius:2px}
+        
+        /* Loading */
+        .loading{text-align:center;color:#666;padding:40px;font-size:0.9em}
+        
+        /* Responsive */
+        @media(max-width:900px){
+            .main-grid{grid-template-columns:1fr}
+            .stats-row{grid-template-columns:repeat(2,1fr)}
+        }
+    </style>
+</head>
+<body>
+    <canvas id="stars"></canvas>
+    
+    <div class="container">
+        <a href="/" class="back">← Volver al Command Center</a>
+        
+        <div class="header">
+            <h1>⛏️ MINING DASHBOARD</h1>
+            <div class="sub">Antminer L7 — 192.168.1.171 — scrypt.unmineable.com</div>
+        </div>
+        
+        <!-- Top Stats Row -->
+        <div class="stats-row" id="topStats">
+            <div class="stat-card">
+                <div class="label">Hashrate</div>
+                <div class="value" id="hashrate">--</div>
+                <div class="trend" id="hashTrend"></div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Active Pool</div>
+                <div class="value" id="poolStatus" style="font-size:1em">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Shares</div>
+                <div class="value" id="shares" style="font-size:1.2em">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Uptime</div>
+                <div class="value" id="uptime" style="font-size:1.2em">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Est. Daily DOGE</div>
+                <div class="value" id="dailyDoge" style="font-size:1.3em">--</div>
+            </div>
+        </div>
+        
+        <!-- Main Grid: Hashrate Chart + Temps -->
+        <div class="main-grid">
+            <div class="panel">
+                <h2>📈 Hashrate Chart (2h History)</h2>
+                <canvas id="hashChart"></canvas>
+            </div>
+            
+            <div class="panel">
+                <h2>🌡️ Temperature Gauges</h2>
+                <div class="temp-grid" id="tempGauges">
+                    <!-- Gauges will be inserted here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottom Grid: Pool Info + Fans + Profitability -->
+        <div class="bottom-grid">
+            <div class="panel">
+                <h2>🏊 Pool Info</h2>
+                <div class="pool-info" id="poolInfo">
+                    <div class="loading">Cargando...</div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>🌀 Fan Speed</h2>
+                <div class="fan-grid" id="fanGrid">
+                    <div class="loading">Cargando...</div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>💰 Profitability</h2>
+                <div id="profitability">
+                    <div class="loading">Calculando...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- History Log -->
+        <div class="panel">
+            <h2>📝 History Log</h2>
+            <div class="log" id="historyLog">
+                <div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg">Iniciando dashboard...</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // === CONFIG ===
+    const IDEAL_HASHRATE = 6711; // MH/s (6.711 GH/s)
+    const UPDATE_INTERVAL = 30000; // 30s
+    const CHART_HISTORY = 240; // 2 hours (240 data points @ 30s interval)
+    const DOGE_PRICE_EUR = 0.08; // Fallback if API fails
+    
+    // === STATE ===
+    let hashHistory = [];
+    let lastHashrate = 0;
+    let dogePrice = DOGE_PRICE_EUR;
+    
+    // === STARFIELD BACKGROUND ===
+    (function(){
+        const c=document.getElementById('stars'),ctx=c.getContext('2d');
+        let w,h,stars=[];
+        function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;
+            stars=[];for(let i=0;i<150;i++)stars.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005})}
+        function draw(){ctx.clearRect(0,0,w,h);
+            stars.forEach(s=>{s.a+=s.s;if(s.a>1)s.s=-Math.abs(s.s);if(s.a<0.1)s.s=Math.abs(s.s);
+                ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(245,158,11,${s.a*0.6})`;ctx.fill()});
+            requestAnimationFrame(draw)}
+        resize();draw();window.addEventListener('resize',resize);
+    })();
+    
+    // === HASHRATE CHART ===
+    const chartCanvas = document.getElementById('hashChart');
+    const chartCtx = chartCanvas.getContext('2d');
+    
+    function drawChart() {
+        const w = chartCanvas.width = chartCanvas.offsetWidth;
+        const h = chartCanvas.height = chartCanvas.offsetHeight;
+        const padding = 40;
+        const plotW = w - 2 * padding;
+        const plotH = h - 2 * padding;
+        
+        chartCtx.clearRect(0, 0, w, h);
+        
+        if (hashHistory.length === 0) {
+            chartCtx.fillStyle = '#666';
+            chartCtx.font = '14px JetBrains Mono';
+            chartCtx.textAlign = 'center';
+            chartCtx.fillText('Esperando datos...', w/2, h/2);
+            return;
+        }
+        
+        // Find min/max for scaling
+        const values = hashHistory.map(p => p.value);
+        const minVal = Math.min(...values, IDEAL_HASHRATE * 0.8);
+        const maxVal = Math.max(...values, IDEAL_HASHRATE * 1.2);
+        const range = maxVal - minVal;
+        
+        // Draw ideal line
+        const idealY = padding + plotH - ((IDEAL_HASHRATE - minVal) / range * plotH);
+        chartCtx.strokeStyle = 'rgba(245,158,11,0.3)';
+        chartCtx.lineWidth = 1;
+        chartCtx.setLineDash([5, 5]);
+        chartCtx.beginPath();
+        chartCtx.moveTo(padding, idealY);
+        chartCtx.lineTo(w - padding, idealY);
+        chartCtx.stroke();
+        chartCtx.setLineDash([]);
+        
+        // Label for ideal line
+        chartCtx.fillStyle = 'rgba(245,158,11,0.6)';
+        chartCtx.font = '11px JetBrains Mono';
+        chartCtx.textAlign = 'right';
+        chartCtx.fillText(`${IDEAL_HASHRATE} MH/s`, w - padding - 5, idealY - 5);
+        
+        // Draw hashrate line
+        chartCtx.strokeStyle = '#00ff88';
+        chartCtx.lineWidth = 2;
+        chartCtx.beginPath();
+        hashHistory.forEach((p, i) => {
+            const x = padding + (i / (CHART_HISTORY - 1)) * plotW;
+            const y = padding + plotH - ((p.value - minVal) / range * plotH);
+            if (i === 0) chartCtx.moveTo(x, y);
+            else chartCtx.lineTo(x, y);
+            
+            // Change color if below ideal
+            if (p.value < IDEAL_HASHRATE) chartCtx.strokeStyle = '#f59e0b';
+        });
+        chartCtx.stroke();
+        
+        // Draw points
+        hashHistory.forEach((p, i) => {
+            const x = padding + (i / (CHART_HISTORY - 1)) * plotW;
+            const y = padding + plotH - ((p.value - minVal) / range * plotH);
+            chartCtx.beginPath();
+            chartCtx.arc(x, y, 3, 0, Math.PI * 2);
+            chartCtx.fillStyle = p.value >= IDEAL_HASHRATE ? '#00ff88' : '#f59e0b';
+            chartCtx.fill();
+        });
+        
+        // Axes
+        chartCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+        chartCtx.lineWidth = 1;
+        chartCtx.strokeRect(padding, padding, plotW, plotH);
+        
+        // Y-axis labels
+        chartCtx.fillStyle = '#666';
+        chartCtx.font = '10px JetBrains Mono';
+        chartCtx.textAlign = 'right';
+        for (let i = 0; i <= 4; i++) {
+            const val = minVal + (range / 4) * i;
+            const y = padding + plotH - (i / 4) * plotH;
+            chartCtx.fillText(Math.round(val), padding - 10, y + 4);
+        }
+        
+        // X-axis label (time ago)
+        chartCtx.textAlign = 'center';
+        chartCtx.fillText('2h ago', padding, h - 10);
+        chartCtx.fillText('now', w - padding, h - 10);
+    }
+    
+    // === TEMPERATURE GAUGES ===
+    function drawTempGauge(canvas, chipTemp, pcbTemp, label) {
+        const ctx = canvas.getContext('2d');
+        const size = 100;
+        canvas.width = size;
+        canvas.height = size;
+        const cx = size / 2;
+        const cy = size / 2;
+        const radius = 35;
+        
+        // Background circle
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Chip temp (inner ring)
+        const chipColor = chipTemp < 60 ? '#00ff88' : chipTemp < 75 ? '#f59e0b' : '#ff3366';
+        const chipAngle = (chipTemp / 100) * Math.PI * 2;
+        ctx.strokeStyle = chipColor;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 8, -Math.PI/2, -Math.PI/2 + chipAngle);
+        ctx.stroke();
+        
+        // PCB temp (outer ring)
+        const pcbColor = pcbTemp < 60 ? '#00ff88' : pcbTemp < 75 ? '#f59e0b' : '#ff3366';
+        const pcbAngle = (pcbTemp / 100) * Math.PI * 2;
+        ctx.strokeStyle = pcbColor;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius + 8, -Math.PI/2, -Math.PI/2 + pcbAngle);
+        ctx.stroke();
+        
+        // Center text
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px Orbitron';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(Math.round(chipTemp) + '°', cx, cy - 5);
+        ctx.font = '10px JetBrains Mono';
+        ctx.fillStyle = '#888';
+        ctx.fillText('PCB: ' + Math.round(pcbTemp) + '°', cx, cy + 12);
+    }
+    
+    function updateTempGauges(data) {
+        const container = document.getElementById('tempGauges');
+        container.innerHTML = '';
+        
+        for (let i = 1; i <= 4; i++) {
+            const chain = data[`chain${i}`];
+            if (!chain) continue;
+            
+            const div = document.createElement('div');
+            div.className = 'temp-gauge';
+            const canvas = document.createElement('canvas');
+            div.appendChild(canvas);
+            
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = `Chain ${i}`;
+            div.appendChild(label);
+            
+            const value = document.createElement('div');
+            value.className = 'value';
+            value.textContent = `Chip: ${Math.round(chain.chip)}° | PCB: ${Math.round(chain.pcb)}°`;
+            div.appendChild(value);
+            
+            container.appendChild(div);
+            
+            drawTempGauge(canvas, chain.chip, chain.pcb, `Chain ${i}`);
+        }
+    }
+    
+    // === FETCH MINING DATA ===
+    async function fetchMiningData() {
+        try {
+            const res = await fetch('/api/mining/all');
+            if (!res.ok) throw new Error('API offline');
+            const data = await res.json();
+            
+            updateTopStats(data);
+            updateHashChart(data);
+            updateTemps(data);
+            updatePoolInfo(data);
+            updateFans(data);
+            updateProfitability(data);
+            addLogEntry('Datos actualizados', 'success');
+            
+        } catch (e) {
+            console.error('Mining data fetch error:', e);
+            addLogEntry('Error al conectar con el miner: ' + e.message, 'error');
+        }
+    }
+    
+    // === UPDATE TOP STATS ===
+    function updateTopStats(data) {
+        // Hashrate
+        const hashrate = data.hashrate || 0; // MH/s
+        const hashrateGH = (hashrate / 1000).toFixed(2);
+        document.getElementById('hashrate').textContent = hashrateGH + ' GH/s';
+        
+        // Trend arrow
+        const trendEl = document.getElementById('hashTrend');
+        if (lastHashrate > 0) {
+            if (hashrate > lastHashrate) {
+                trendEl.textContent = '▲ ' + ((hashrate - lastHashrate) / 1000).toFixed(2) + ' GH/s';
+                trendEl.className = 'trend up';
+            } else if (hashrate < lastHashrate) {
+                trendEl.textContent = '▼ ' + ((lastHashrate - hashrate) / 1000).toFixed(2) + ' GH/s';
+                trendEl.className = 'trend down';
+            } else {
+                trendEl.textContent = '━ Estable';
+                trendEl.className = 'trend';
+            }
+        }
+        lastHashrate = hashrate;
+        
+        // Pool status
+        const poolAlive = data.poolAlive || false;
+        const poolEl = document.getElementById('poolStatus');
+        poolEl.innerHTML = poolAlive ? '<span class="badge-alive">ALIVE</span>' : '<span class="badge-dead">DEAD</span>';
+        
+        // Shares
+        const accepted = data.accepted || 0;
+        const rejected = data.rejected || 0;
+        const rejectionRate = accepted > 0 ? ((rejected / (accepted + rejected)) * 100).toFixed(2) : 0;
+        document.getElementById('shares').innerHTML = `${accepted} / ${rejected}<br><span style="font-size:0.7em;color:#888">${rejectionRate}% reject</span>`;
+        
+        // Uptime
+        const uptime = data.uptime || 0; // seconds
+        const hours = Math.floor(uptime / 3600);
+        const mins = Math.floor((uptime % 3600) / 60);
+        document.getElementById('uptime').textContent = `${hours}h ${mins}m`;
+        
+        // Daily DOGE
+        const dailyDoge = calculateDailyDoge(hashrate);
+        document.getElementById('dailyDoge').innerHTML = `${dailyDoge.toFixed(2)}<br><span style="font-size:0.6em;color:#888">≈ €${(dailyDoge * dogePrice).toFixed(2)}</span>`;
+    }
+    
+    // === UPDATE HASH CHART ===
+    function updateHashChart(data) {
+        const hashrate = data.hashrate || 0;
+        const now = new Date();
+        
+        hashHistory.push({ time: now, value: hashrate });
+        if (hashHistory.length > CHART_HISTORY) hashHistory.shift();
+        
+        drawChart();
+    }
+    
+    // === UPDATE TEMPS ===
+    function updateTemps(data) {
+        const temps = {};
+        for (let i = 1; i <= 4; i++) {
+            temps[`chain${i}`] = {
+                chip: data[`temp${i}_chip`] || 0,
+                pcb: data[`temp${i}_pcb`] || 0
+            };
+        }
+        updateTempGauges(temps);
+    }
+    
+    // === UPDATE POOL INFO ===
+    function updatePoolInfo(data) {
+        const container = document.getElementById('poolInfo');
+        container.innerHTML = `
+            <table>
+                <tr><td>Pool URL</td><td>${data.poolUrl || 'scrypt.unmineable.com:3333'}</td></tr>
+                <tr><td>User</td><td>${data.poolUser || 'DOGE:DMC...'}</td></tr>
+                <tr><td>Worker</td><td>${data.poolWorker || 'L7-001'}</td></tr>
+                <tr><td>Difficulty</td><td>${(data.difficulty || 0).toFixed(2)}</td></tr>
+                <tr><td>Accepted</td><td style="color:var(--green)">${data.accepted || 0}</td></tr>
+                <tr><td>Rejected</td><td style="color:var(--red)">${data.rejected || 0}</td></tr>
+                <tr><td>Status</td><td>${data.poolAlive ? '<span class="badge-alive">ALIVE</span>' : '<span class="badge-dead">DEAD</span>'}</td></tr>
+            </table>
+        `;
+    }
+    
+    // === UPDATE FANS ===
+    function updateFans(data) {
+        const container = document.getElementById('fanGrid');
+        container.innerHTML = '';
+        
+        for (let i = 1; i <= 4; i++) {
+            const rpm = data[`fan${i}`] || 0;
+            const div = document.createElement('div');
+            div.className = 'fan-item ' + (rpm > 3000 && rpm < 7000 ? 'normal' : 'warning');
+            div.innerHTML = `
+                <div class="fan-icon">🌀</div>
+                <div class="rpm">${rpm}</div>
+                <div class="label">Fan ${i}</div>
+            `;
+            container.appendChild(div);
+        }
+    }
+    
+    // === UPDATE PROFITABILITY ===
+    function updateProfitability(data) {
+        const hashrate = data.hashrate || 0;
+        const daily = calculateDailyDoge(hashrate);
+        const weekly = daily * 7;
+        const monthly = daily * 30;
+        
+        const container = document.getElementById('profitability');
+        container.innerHTML = `
+            <table class="profit-table">
+                <tr>
+                    <th>Period</th>
+                    <th style="text-align:right">DOGE</th>
+                    <th style="text-align:right">EUR</th>
+                </tr>
+                <tr>
+                    <td>Daily</td>
+                    <td style="text-align:right" class="profit-highlight">${daily.toFixed(2)}</td>
+                    <td style="text-align:right">€${(daily * dogePrice).toFixed(2)}</td>
+                </tr>
+                <tr>
+                    <td>Weekly</td>
+                    <td style="text-align:right">${weekly.toFixed(2)}</td>
+                    <td style="text-align:right">€${(weekly * dogePrice).toFixed(2)}</td>
+                </tr>
+                <tr>
+                    <td>Monthly</td>
+                    <td style="text-align:right">${monthly.toFixed(2)}</td>
+                    <td style="text-align:right">€${(monthly * dogePrice).toFixed(2)}</td>
+                </tr>
+            </table>
+            
+            <div class="pool-compare">
+                <strong>Pool Comparison (Est.)</strong>
+                <table>
+                    <tr>
+                        <th>Pool</th>
+                        <th style="text-align:right">Fee</th>
+                        <th style="text-align:right">Daily DOGE</th>
+                    </tr>
+                    <tr>
+                        <td><span class="current">● </span>Unmineable</td>
+                        <td style="text-align:right">1%</td>
+                        <td style="text-align:right">${daily.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>ViaBTC</td>
+                        <td style="text-align:right">2%</td>
+                        <td style="text-align:right">${(daily * 0.98).toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Litecoinpool</td>
+                        <td style="text-align:right">0%</td>
+                        <td style="text-align:right">${(daily * 1.01).toFixed(2)}</td>
+                    </tr>
+                </table>
+            </div>
+        `;
+    }
+    
+    // === CALCULATE DAILY DOGE ===
+    function calculateDailyDoge(hashrateMH) {
+        // Rough estimate: L7 @ 6711 MH/s ≈ 80-100 DOGE/day (varies with difficulty)
+        const baseline = 90; // DOGE/day at ideal hashrate
+        return (hashrateMH / IDEAL_HASHRATE) * baseline;
+    }
+    
+    // === ADD LOG ENTRY ===
+    function addLogEntry(message, type = '') {
+        const log = document.getElementById('historyLog');
+        const now = new Date();
+        const time = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${message}</span>`;
+        
+        log.insertBefore(entry, log.firstChild);
+        
+        // Keep last 50 entries
+        while (log.children.length > 50) log.removeChild(log.lastChild);
+    }
+    
+    // === FETCH DOGE PRICE ===
+    async function fetchDogePrice() {
+        try {
+            const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=eur');
+            const data = await res.json();
+            dogePrice = data.dogecoin.eur;
+            addLogEntry(`Precio DOGE actualizado: €${dogePrice.toFixed(4)}`, 'success');
+        } catch (e) {
+            console.warn('Failed to fetch DOGE price, using fallback');
+            addLogEntry('Usando precio DOGE estimado: €' + DOGE_PRICE_EUR, 'warning');
+        }
+    }
+    
+    // === INIT ===
+    async function init() {
+        addLogEntry('Dashboard iniciado', 'success');
+        await fetchDogePrice();
+        await fetchMiningData();
+        
+        // Update every 30s
+        setInterval(fetchMiningData, UPDATE_INTERVAL);
+        
+        // Update DOGE price every 10 minutes
+        setInterval(fetchDogePrice, 600000);
+    }
+    
+    init();
+    </script>
+</body>
+</html>

@@ -6,9 +6,40 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
+const multer = require('multer');
 
 const app = express();
 const PORT = 9443;
+
+// === MULTER (File Uploads) ===
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads', 'invoices');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|pdf|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb(new Error('Only images (JPEG, PNG, WebP) and PDF files are allowed'));
+    }
+});
 
 // === REDIS CLIENT (FalkorDB) ===
 let Redis;
@@ -482,6 +513,132 @@ app.get('/api/vectors/collections', requireAuth, proxyQdrant('/collections'));
 app.get('/api/vectors/collection/:name', requireAuth, proxyQdrant('/collections/:name'));
 app.post('/api/vectors/collection/:name/points/scroll', requireAuth, proxyQdrant('/collections/:name/points/scroll', 'POST'));
 
+// === MINING API (Antminer L7 cgminer proxy) ===
+
+// Query cgminer API on Antminer L7
+function queryMiner(command) {
+    return new Promise((resolve, reject) => {
+        const client = new net.Socket();
+        client.setTimeout(5000);
+        
+        client.connect(4028, '192.168.1.171', () => {
+            const msg = JSON.stringify({ command }) + '\n';
+            client.write(msg);
+        });
+        
+        let data = '';
+        client.on('data', (chunk) => {
+            data += chunk.toString();
+        });
+        
+        client.on('end', () => {
+            try {
+                // Clean non-printable chars and parse JSON
+                const cleaned = data.replace(/[^\x20-\x7E\n]/g, '');
+                const json = JSON.parse(cleaned);
+                resolve(json);
+            } catch (e) {
+                resolve({ raw: data, error: 'Parse error' });
+            }
+        });
+        
+        client.on('error', (err) => {
+            reject(err);
+        });
+        
+        client.on('timeout', () => {
+            client.destroy();
+            reject(new Error('Miner connection timeout'));
+        });
+    });
+}
+
+// Parse cgminer data into simplified format
+function parseMinerData(summary, stats, pools) {
+    const data = {};
+    
+    // Summary data
+    if (summary && summary.SUMMARY && summary.SUMMARY[0]) {
+        const s = summary.SUMMARY[0];
+        data.hashrate = s['MHS 5s'] || s['GHS 5s'] * 1000 || 0; // Convert to MH/s
+        data.accepted = s.Accepted || 0;
+        data.rejected = s.Rejected || 0;
+        data.uptime = s.Elapsed || 0;
+    }
+    
+    // Stats data (temperatures, fans)
+    if (stats && stats.STATS && stats.STATS[1]) {
+        const st = stats.STATS[1];
+        
+        // Temperatures (chain 1-4)
+        for (let i = 1; i <= 4; i++) {
+            data[`temp${i}_chip`] = st[`temp${i}`] || st[`temp2_${i}`] || 0;
+            data[`temp${i}_pcb`] = st[`temp_pcb${i}`] || st[`temp${i}_pcb`] || 0;
+        }
+        
+        // Fans (1-4)
+        for (let i = 1; i <= 4; i++) {
+            data[`fan${i}`] = st[`fan${i}`] || 0;
+        }
+    }
+    
+    // Pool data
+    if (pools && pools.POOLS && pools.POOLS[0]) {
+        const p = pools.POOLS[0];
+        data.poolUrl = p.URL || 'unknown';
+        data.poolUser = p.User || 'unknown';
+        data.poolWorker = p.User ? p.User.split('.')[1] : 'unknown';
+        data.poolAlive = p.Status === 'Alive';
+        data.difficulty = p.Difficulty || 0;
+    }
+    
+    return data;
+}
+
+// Mining API routes
+app.get('/api/mining/summary', requireAuth, async (req, res) => {
+    try {
+        const result = await queryMiner('summary');
+        res.json(result);
+    } catch (e) {
+        res.status(503).json({ error: e.message });
+    }
+});
+
+app.get('/api/mining/stats', requireAuth, async (req, res) => {
+    try {
+        const result = await queryMiner('stats');
+        res.json(result);
+    } catch (e) {
+        res.status(503).json({ error: e.message });
+    }
+});
+
+app.get('/api/mining/pools', requireAuth, async (req, res) => {
+    try {
+        const result = await queryMiner('pools');
+        res.json(result);
+    } catch (e) {
+        res.status(503).json({ error: e.message });
+    }
+});
+
+// Combined endpoint - fetches all data and parses it
+app.get('/api/mining/all', requireAuth, async (req, res) => {
+    try {
+        const [summary, stats, pools] = await Promise.all([
+            queryMiner('summary'),
+            queryMiner('stats'),
+            queryMiner('pools')
+        ]);
+        
+        const data = parseMinerData(summary, stats, pools);
+        res.json(data);
+    } catch (e) {
+        res.status(503).json({ error: e.message });
+    }
+});
+
 // === CAMERA PROXY ===
 
 app.get('/api/cam/dgx/snapshot', requireAuth, (req, res) => {
@@ -533,6 +690,408 @@ app.get('/api/cam/jetson/detections', requireAuth, (req, res) => {
     });
     camReq.on('error', () => res.status(503).json({ error: 'Jetson offline' }));
     camReq.setTimeout(3000, () => { camReq.destroy(); res.status(504).json({ error: 'timeout' }); });
+});
+
+// === INVOICE OCR ===
+
+// OCR endpoint - extracts invoice data from image using Ollama vision model
+app.post('/api/pife/invoices/ocr', requireAuth, upload.single('invoice'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    try {
+        console.log(`[OCR] Processing invoice: ${req.file.filename}`);
+        
+        // Read image and convert to base64
+        const imageBuffer = fs.readFileSync(req.file.path);
+        const base64Image = imageBuffer.toString('base64');
+        
+        // Prepare Ollama request
+        const ollamaPrompt = `Extract invoice data from this image. Return ONLY valid JSON with this exact structure:
+{
+  "number": "invoice number",
+  "issuer_name": "company name",
+  "issuer_tax_id": "tax ID (NIF/CIF)",
+  "date": "YYYY-MM-DD",
+  "due_date": "YYYY-MM-DD or null",
+  "subtotal": 0.00,
+  "tax_rate": 0.00,
+  "tax_amount": 0.00,
+  "irpf_rate": 0.00,
+  "irpf_amount": 0.00,
+  "total": 0.00,
+  "currency": "EUR",
+  "is_eu": false,
+  "lines": [
+    {
+      "description": "item description",
+      "quantity": 1,
+      "unit_price": 0.00
+    }
+  ]
+}
+If a field is not visible, use null or 0. Extract all visible line items. Be precise with numbers.`;
+
+        const ollamaData = JSON.stringify({
+            model: 'qwen3-vl',
+            prompt: ollamaPrompt,
+            images: [base64Image],
+            stream: false
+        });
+
+        // Call Ollama
+        const options = {
+            hostname: '127.0.0.1',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(ollamaData)
+            }
+        };
+
+        const ollamaReq = http.request(options, (ollamaRes) => {
+            let responseData = '';
+            
+            ollamaRes.on('data', chunk => {
+                responseData += chunk.toString();
+            });
+
+            ollamaRes.on('end', () => {
+                try {
+                    const ollamaResponse = JSON.parse(responseData);
+                    const responseText = ollamaResponse.response || '';
+                    
+                    // Extract JSON from response (model might wrap it in markdown)
+                    let extractedData;
+                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        extractedData = JSON.parse(jsonMatch[0]);
+                    } else {
+                        extractedData = JSON.parse(responseText);
+                    }
+
+                    // Add file path for reference
+                    extractedData.file_path = `/uploads/invoices/${req.file.filename}`;
+                    extractedData.original_filename = req.file.originalname;
+
+                    console.log(`[OCR] Success: ${req.file.filename}`);
+                    res.json({
+                        success: true,
+                        data: extractedData,
+                        file: {
+                            path: req.file.path,
+                            url: `/uploads/invoices/${req.file.filename}`
+                        }
+                    });
+                } catch (parseError) {
+                    console.error(`[OCR] Parse error:`, parseError);
+                    res.status(500).json({ 
+                        error: 'Failed to parse OCR response',
+                        details: parseError.message,
+                        raw: responseData.substring(0, 500)
+                    });
+                }
+            });
+        });
+
+        ollamaReq.on('error', (error) => {
+            console.error(`[OCR] Ollama error:`, error);
+            res.status(503).json({ 
+                error: 'Ollama service unavailable',
+                details: error.message
+            });
+        });
+
+        ollamaReq.setTimeout(60000, () => {
+            ollamaReq.destroy();
+            res.status(504).json({ error: 'OCR timeout - image might be too large' });
+        });
+
+        ollamaReq.write(ollamaData);
+        ollamaReq.end();
+
+    } catch (error) {
+        console.error(`[OCR] Error:`, error);
+        // Clean up uploaded file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ 
+            error: 'OCR processing failed',
+            details: error.message
+        });
+    }
+});
+
+// Confirm and save invoice - creates invoice + lines in Supabase
+app.post('/api/pife/invoices/confirm', requireAuth, async (req, res) => {
+    try {
+        const { invoice, lines } = req.body;
+        
+        if (!invoice) {
+            return res.status(400).json({ error: 'Invoice data required' });
+        }
+
+        console.log(`[INVOICE] Saving invoice: ${invoice.number}`);
+
+        // First, create the invoice
+        const invoiceData = JSON.stringify({
+            number: invoice.number,
+            type: invoice.type || 'recibida',
+            contact_name: invoice.issuer_name || invoice.contact_name,
+            contact_tax_id: invoice.issuer_tax_id || invoice.contact_tax_id,
+            date: invoice.date,
+            due_date: invoice.due_date,
+            status: invoice.status || 'pendiente',
+            subtotal: parseFloat(invoice.subtotal) || 0,
+            tax_rate: parseFloat(invoice.tax_rate) || 0,
+            tax_amount: parseFloat(invoice.tax_amount) || 0,
+            irpf_rate: parseFloat(invoice.irpf_rate) || 0,
+            irpf_amount: parseFloat(invoice.irpf_amount) || 0,
+            total: parseFloat(invoice.total) || 0,
+            business_line: invoice.business_line,
+            category: invoice.category,
+            description: invoice.description,
+            is_eu: invoice.is_eu || false,
+            is_intracom: invoice.is_intracom || false,
+            file_path: invoice.file_path
+        });
+
+        const invoiceOptions = {
+            hostname: '127.0.0.1',
+            port: 3001,
+            path: '/invoices',
+            method: 'POST',
+            headers: {
+                'Accept-Profile': 'pife',
+                'Content-Profile': 'pife',
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(invoiceData),
+                'Prefer': 'return=representation'
+            }
+        };
+
+        const invoiceReq = http.request(invoiceOptions, (invoiceRes) => {
+            let body = '';
+            invoiceRes.on('data', chunk => body += chunk);
+            invoiceRes.on('end', async () => {
+                if (invoiceRes.statusCode >= 200 && invoiceRes.statusCode < 300) {
+                    const createdInvoice = JSON.parse(body)[0];
+                    console.log(`[INVOICE] Created invoice ID: ${createdInvoice.id}`);
+
+                    // Now create invoice lines if provided
+                    if (lines && lines.length > 0) {
+                        const linesData = lines.map(line => ({
+                            invoice_id: createdInvoice.id,
+                            description: line.description,
+                            quantity: parseFloat(line.quantity) || 1,
+                            unit_price: parseFloat(line.unit_price) || 0,
+                            tax_rate: parseFloat(line.tax_rate) || parseFloat(invoice.tax_rate) || 0,
+                            subtotal: parseFloat(line.subtotal) || (parseFloat(line.quantity) * parseFloat(line.unit_price))
+                        }));
+
+                        const linesPayload = JSON.stringify(linesData);
+                        const linesOptions = {
+                            hostname: '127.0.0.1',
+                            port: 3001,
+                            path: '/invoice_lines',
+                            method: 'POST',
+                            headers: {
+                                'Accept-Profile': 'pife',
+                                'Content-Profile': 'pife',
+                                'Content-Type': 'application/json',
+                                'Content-Length': Buffer.byteLength(linesPayload),
+                                'Prefer': 'return=representation'
+                            }
+                        };
+
+                        const linesReq = http.request(linesOptions, (linesRes) => {
+                            let linesBody = '';
+                            linesRes.on('data', chunk => linesBody += chunk);
+                            linesRes.on('end', () => {
+                                if (linesRes.statusCode >= 200 && linesRes.statusCode < 300) {
+                                    console.log(`[INVOICE] Created ${lines.length} invoice lines`);
+                                    res.json({
+                                        success: true,
+                                        invoice: createdInvoice,
+                                        lines: JSON.parse(linesBody)
+                                    });
+                                } else {
+                                    console.error(`[INVOICE] Lines error:`, linesBody);
+                                    res.status(linesRes.statusCode).json({ 
+                                        error: 'Failed to create invoice lines',
+                                        invoice: createdInvoice,
+                                        details: linesBody
+                                    });
+                                }
+                            });
+                        });
+
+                        linesReq.on('error', (err) => {
+                            console.error(`[INVOICE] Lines request error:`, err);
+                            res.status(500).json({ 
+                                error: 'Failed to save invoice lines',
+                                invoice: createdInvoice
+                            });
+                        });
+
+                        linesReq.write(linesPayload);
+                        linesReq.end();
+                    } else {
+                        // No lines to create
+                        res.json({
+                            success: true,
+                            invoice: createdInvoice
+                        });
+                    }
+                } else {
+                    console.error(`[INVOICE] Error:`, body);
+                    res.status(invoiceRes.statusCode).json({ 
+                        error: 'Failed to create invoice',
+                        details: body
+                    });
+                }
+            });
+        });
+
+        invoiceReq.on('error', (err) => {
+            console.error(`[INVOICE] Request error:`, err);
+            res.status(500).json({ 
+                error: 'Failed to save invoice',
+                details: err.message
+            });
+        });
+
+        invoiceReq.write(invoiceData);
+        invoiceReq.end();
+
+    } catch (error) {
+        console.error(`[INVOICE] Confirm error:`, error);
+        res.status(500).json({ 
+            error: 'Failed to confirm invoice',
+            details: error.message
+        });
+    }
+});
+
+// Serve uploaded invoice files
+app.use('/uploads', requireAuth, express.static(path.join(__dirname, 'uploads')));
+
+// === CHAT API (Supabase api schema) ===
+
+// Get all channels
+app.get('/api/chat/channels', requireAuth, (req, res) => {
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: '/chat_channels?order=id.asc',
+        method: 'GET',
+        headers: {
+            'Accept-Profile': 'api',
+            'Content-Profile': 'api',
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const reqProxy = http.request(options, (proxyRes) => {
+        let body = '';
+        proxyRes.on('data', chunk => body += chunk);
+        proxyRes.on('end', () => {
+            res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+        });
+    });
+
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.setTimeout(5000, () => { reqProxy.destroy(); res.status(504).json({ error: 'timeout' }); });
+    reqProxy.end();
+});
+
+// Get messages for a channel
+app.get('/api/chat/messages', requireAuth, (req, res) => {
+    const { channel_id, limit = 50, after } = req.query;
+    
+    if (!channel_id) {
+        return res.status(400).json({ error: 'channel_id required' });
+    }
+
+    let path = `/chat_messages?channel_id=eq.${channel_id}&order=created_at.asc&limit=${limit}`;
+    if (after) {
+        path += `&id=gt.${after}`;
+    }
+
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: path,
+        method: 'GET',
+        headers: {
+            'Accept-Profile': 'api',
+            'Content-Profile': 'api',
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const reqProxy = http.request(options, (proxyRes) => {
+        let body = '';
+        proxyRes.on('data', chunk => body += chunk);
+        proxyRes.on('end', () => {
+            res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+        });
+    });
+
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.setTimeout(5000, () => { reqProxy.destroy(); res.status(504).json({ error: 'timeout' }); });
+    reqProxy.end();
+});
+
+// Post a message
+app.post('/api/chat/messages', requireAuth, (req, res) => {
+    const { channel_id, content, reply_to } = req.body;
+    const sender = req.session.user.username;
+    const sender_role = req.session.user.role === 'admin' ? 'jefe' : 'agent';
+
+    if (!channel_id || !content) {
+        return res.status(400).json({ error: 'channel_id and content required' });
+    }
+
+    const message = {
+        channel_id,
+        sender,
+        sender_role,
+        content,
+        reply_to: reply_to || null
+    };
+
+    const data = JSON.stringify(message);
+    const options = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: '/chat_messages',
+        method: 'POST',
+        headers: {
+            'Accept-Profile': 'api',
+            'Content-Profile': 'api',
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data),
+            'Prefer': 'return=representation'
+        }
+    };
+
+    const reqProxy = http.request(options, (proxyRes) => {
+        let body = '';
+        proxyRes.on('data', chunk => body += chunk);
+        proxyRes.on('end', () => {
+            res.status(proxyRes.statusCode).set('Content-Type', 'application/json').send(body);
+        });
+    });
+
+    reqProxy.on('error', () => res.status(503).json({ error: 'Supabase offline' }));
+    reqProxy.setTimeout(5000, () => { reqProxy.destroy(); res.status(504).json({ error: 'timeout' }); });
+    reqProxy.write(data);
+    reqProxy.end();
 });
 
 // Protected static files — index.html is the main hub
