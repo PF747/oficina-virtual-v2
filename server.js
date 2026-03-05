@@ -639,6 +639,202 @@ app.get('/api/mining/all', requireAuth, async (req, res) => {
     }
 });
 
+// === INFRASTRUCTURE STATUS ===
+
+app.get('/api/infra/status', requireAuth, async (req, res) => {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const net = require('net');
+
+    const status = {};
+
+    // Helper: check if port is open
+    function checkPort(host, port, timeout = 3000) {
+        return new Promise((resolve) => {
+            const socket = new net.Socket();
+            socket.setTimeout(timeout);
+            socket.on('connect', () => {
+                socket.destroy();
+                resolve(true);
+            });
+            socket.on('timeout', () => {
+                socket.destroy();
+                resolve(false);
+            });
+            socket.on('error', () => {
+                resolve(false);
+            });
+            socket.connect(port, host);
+        });
+    }
+
+    // DGX (localhost) - get GPU temp, RAM, disk
+    try {
+        // Try tegrastats for Jetson
+        try {
+            const { stdout: tegraStats } = await execAsync('timeout 1 tegrastats --interval 500 2>/dev/null | head -1', { timeout: 2000 });
+            const tempMatch = tegraStats.match(/GPU@([\d.]+)C/);
+            const ramMatch = tegraStats.match(/RAM (\d+)\/(\d+)MB/);
+            if (tempMatch) {
+                status.dgx = { online: true, gpu_temp: parseFloat(tempMatch[1]) };
+            }
+            if (ramMatch) {
+                const used = parseInt(ramMatch[1]);
+                const total = parseInt(ramMatch[2]);
+                status.dgx = { ...status.dgx, ram_percent: Math.round((used / total) * 100) };
+            }
+        } catch (e) {
+            // Not a Jetson, try nvidia-smi
+            try {
+                const { stdout: nvidiaSmi } = await execAsync('nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null', { timeout: 2000 });
+                const temp = parseFloat(nvidiaSmi.trim().split('\n')[0]);
+                if (!isNaN(temp)) {
+                    status.dgx = { online: true, gpu_temp: temp };
+                }
+            } catch (e) {
+                // No GPU, just mark as online
+                status.dgx = { online: true };
+            }
+        }
+
+        // RAM (generic)
+        try {
+            const { stdout: memInfo } = await execAsync('free | grep Mem', { timeout: 1000 });
+            const parts = memInfo.trim().split(/\s+/);
+            if (parts.length >= 3) {
+                const total = parseInt(parts[1]);
+                const used = parseInt(parts[2]);
+                status.dgx = { ...status.dgx, ram_percent: Math.round((used / total) * 100) };
+            }
+        } catch (e) { }
+
+        // Disk
+        try {
+            const { stdout: diskInfo } = await execAsync('df -h / | tail -1', { timeout: 1000 });
+            const parts = diskInfo.trim().split(/\s+/);
+            if (parts.length >= 5) {
+                const diskPercent = parseInt(parts[4].replace('%', ''));
+                status.dgx = { ...status.dgx, disk_percent: diskPercent };
+            }
+        } catch (e) { }
+
+        if (!status.dgx) {
+            status.dgx = { online: true };
+        }
+    } catch (e) {
+        status.dgx = { online: false };
+    }
+
+    // Jetson Orin (192.168.1.137:8766)
+    try {
+        const jetsonOnline = await checkPort('192.168.1.137', 8766);
+        if (jetsonOnline) {
+            try {
+                const jetsonReq = http.get('http://192.168.1.137:8766/detections', { timeout: 2000 }, (jetsonRes) => {
+                    let data = '';
+                    jetsonRes.on('data', chunk => data += chunk);
+                    jetsonRes.on('end', () => {
+                        try {
+                            const detections = JSON.parse(data);
+                            status.jetson = { online: true, detections: detections.count || 0 };
+                        } catch {
+                            status.jetson = { online: true };
+                        }
+                    });
+                });
+                jetsonReq.on('error', () => {
+                    status.jetson = { online: true };
+                });
+                jetsonReq.setTimeout(2000, () => {
+                    jetsonReq.destroy();
+                    status.jetson = { online: true };
+                });
+            } catch {
+                status.jetson = { online: true };
+            }
+        } else {
+            status.jetson = { online: false };
+        }
+    } catch {
+        status.jetson = { online: false };
+    }
+
+    // Antminer L7 (192.168.1.171:4028)
+    try {
+        const antminerOnline = await checkPort('192.168.1.171', 4028, 2000);
+        if (antminerOnline) {
+            // Try to query cgminer API
+            const socket = new net.Socket();
+            socket.setTimeout(2000);
+            
+            socket.connect(4028, '192.168.1.171', () => {
+                socket.write(JSON.stringify({ command: 'summary' }) + '\n');
+            });
+
+            let data = '';
+            socket.on('data', chunk => {
+                data += chunk.toString();
+            });
+
+            socket.on('close', () => {
+                try {
+                    const response = JSON.parse(data);
+                    if (response.SUMMARY && response.SUMMARY[0]) {
+                        const summary = response.SUMMARY[0];
+                        status.antminer = {
+                            online: true,
+                            hashrate: (summary['MHS av'] / 1000).toFixed(2), // Convert to GH/s
+                            temp: summary['Temperature'] || null
+                        };
+                    } else {
+                        status.antminer = { online: true };
+                    }
+                } catch {
+                    status.antminer = { online: true };
+                }
+            });
+
+            socket.on('error', () => {
+                status.antminer = { online: true };
+            });
+
+            socket.on('timeout', () => {
+                socket.destroy();
+                status.antminer = { online: true };
+            });
+        } else {
+            status.antminer = { online: false };
+        }
+    } catch {
+        status.antminer = { online: false };
+    }
+
+    // Mac Mini (192.168.1.158) - just check if SSH port is open
+    try {
+        const macOnline = await checkPort('192.168.1.158', 22, 2000);
+        status.macmini = { online: macOnline };
+    } catch {
+        status.macmini = { online: false };
+    }
+
+    // Router (192.168.1.1) - ping check
+    try {
+        await execAsync('ping -c 1 -W 1 192.168.1.1 > /dev/null 2>&1', { timeout: 2000 });
+        status.router = { online: true };
+    } catch {
+        status.router = { online: false };
+    }
+
+    // Monitor is always "online" if Mac Mini is online
+    status.monitor = { online: status.macmini?.online || false };
+
+    // Wait a bit for async operations to complete
+    setTimeout(() => {
+        res.json(status);
+    }, 500);
+});
+
 // === CAMERA PROXY ===
 
 app.get('/api/cam/dgx/snapshot', requireAuth, (req, res) => {
