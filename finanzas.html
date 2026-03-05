@@ -758,6 +758,215 @@
         }
     });
 
+    // === OCR MODAL ===
+    let ocrData = null;
+    let uploadedFile = null;
+
+    function openOCRModal() {
+        document.getElementById('ocrModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+        resetOCR();
+    }
+
+    function closeOCRModal() {
+        document.getElementById('ocrModal').classList.remove('show');
+        document.body.style.overflow = '';
+        resetOCR();
+    }
+
+    function resetOCR() {
+        document.getElementById('ocrUploadArea').style.display = 'block';
+        document.getElementById('ocrProcessing').style.display = 'none';
+        document.getElementById('ocrResults').style.display = 'none';
+        document.getElementById('invoiceFile').value = '';
+        ocrData = null;
+        uploadedFile = null;
+    }
+
+    // Drag & drop
+    const uploadZone = document.getElementById('uploadZone');
+    uploadZone.addEventListener('click', () => {
+        if (!uploadZone.classList.contains('processing')) {
+            document.getElementById('invoiceFile').click();
+        }
+    });
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+    });
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            handleFile(file);
+        }
+    }
+
+    function openCamera() {
+        const input = document.getElementById('invoiceFile');
+        input.setAttribute('capture', 'environment');
+        input.click();
+    }
+
+    async function handleFile(file) {
+        uploadedFile = file;
+        
+        // Show processing
+        document.getElementById('ocrUploadArea').style.display = 'none';
+        document.getElementById('ocrProcessing').style.display = 'block';
+
+        const formData = new FormData();
+        formData.append('invoice', file);
+
+        try {
+            const res = await fetch('/api/pife/invoices/ocr', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'OCR failed');
+            }
+
+            const result = await res.json();
+            ocrData = result.data;
+
+            // Show results
+            document.getElementById('ocrProcessing').style.display = 'none';
+            document.getElementById('ocrResults').style.display = 'block';
+
+            // Show image preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('previewImg').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            // Populate form
+            document.getElementById('ocr_number').value = ocrData.number || '';
+            document.getElementById('ocr_type').value = ocrData.type || 'recibida';
+            document.getElementById('ocr_contact_name').value = ocrData.issuer_name || ocrData.contact_name || '';
+            document.getElementById('ocr_contact_tax_id').value = ocrData.issuer_tax_id || ocrData.contact_tax_id || '';
+            document.getElementById('ocr_date').value = ocrData.date || '';
+            document.getElementById('ocr_due_date').value = ocrData.due_date || '';
+            document.getElementById('ocr_subtotal').value = ocrData.subtotal || 0;
+            document.getElementById('ocr_tax_rate').value = ocrData.tax_rate || 0;
+            document.getElementById('ocr_tax_amount').value = ocrData.tax_amount || 0;
+            document.getElementById('ocr_total').value = ocrData.total || 0;
+            document.getElementById('ocr_irpf_rate').value = ocrData.irpf_rate || 0;
+            document.getElementById('ocr_irpf_amount').value = ocrData.irpf_amount || 0;
+            document.getElementById('ocr_status').value = ocrData.status || 'pendiente';
+            document.getElementById('ocr_business_line').value = ocrData.business_line || '';
+            document.getElementById('ocr_category').value = ocrData.category || '';
+            document.getElementById('ocr_description').value = ocrData.description || '';
+            document.getElementById('ocr_is_eu').checked = ocrData.is_eu || false;
+
+            // Render lines
+            renderOCRLines(ocrData.lines || []);
+
+        } catch (error) {
+            console.error('OCR error:', error);
+            alert('Error al procesar la factura: ' + error.message);
+            resetOCR();
+        }
+    }
+
+    function renderOCRLines(lines) {
+        const container = document.getElementById('linesContainer');
+        if (!lines || lines.length === 0) {
+            container.innerHTML = '<p style="color:#666;font-size:0.8em">No se detectaron líneas de factura</p>';
+            return;
+        }
+
+        container.innerHTML = lines.map((line, idx) => `
+            <div class="line-item">
+                <input type="text" placeholder="Descripción" value="${line.description || ''}" data-line="${idx}" data-field="description">
+                <input type="number" step="0.01" placeholder="Cantidad" value="${line.quantity || 1}" data-line="${idx}" data-field="quantity">
+                <input type="number" step="0.01" placeholder="Precio" value="${line.unit_price || 0}" data-line="${idx}" data-field="unit_price">
+            </div>
+        `).join('');
+
+        // Add event listeners to update ocrData
+        container.querySelectorAll('input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.dataset.line);
+                const field = e.target.dataset.field;
+                if (!ocrData.lines[idx]) ocrData.lines[idx] = {};
+                ocrData.lines[idx][field] = field === 'description' ? e.target.value : parseFloat(e.target.value);
+            });
+        });
+    }
+
+    async function confirmOCRInvoice() {
+        try {
+            // Gather form data
+            const form = document.getElementById('ocrForm');
+            const invoice = {
+                number: form.number.value,
+                type: form.type.value,
+                contact_name: form.contact_name.value,
+                contact_tax_id: form.contact_tax_id.value,
+                date: form.date.value,
+                due_date: form.due_date.value || null,
+                subtotal: parseFloat(form.subtotal.value) || 0,
+                tax_rate: parseFloat(form.tax_rate.value) || 0,
+                tax_amount: parseFloat(form.tax_amount.value) || 0,
+                irpf_rate: parseFloat(form.irpf_rate.value) || 0,
+                irpf_amount: parseFloat(form.irpf_amount.value) || 0,
+                total: parseFloat(form.total.value) || 0,
+                status: form.status.value,
+                business_line: form.business_line.value || null,
+                category: form.category.value || null,
+                description: form.description.value || null,
+                is_eu: form.is_eu.checked,
+                is_intracom: false,
+                file_path: ocrData.file_path
+            };
+
+            // Gather lines data
+            const lines = ocrData.lines || [];
+
+            const res = await fetch('/api/pife/invoices/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ invoice, lines })
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to save invoice');
+            }
+
+            const result = await res.json();
+            console.log('Invoice saved:', result);
+
+            alert('✓ Factura guardada con éxito');
+            
+            // Reload data
+            await loadInvoices();
+            updateStats();
+            renderInvoices();
+            
+            closeOCRModal();
+
+        } catch (error) {
+            console.error('Confirm error:', error);
+            alert('Error al guardar la factura: ' + error.message);
+        }
+    }
+
     // === STARFIELD ===
     (function(){
         const c=document.getElementById('stars'),ctx=c.getContext('2d');
